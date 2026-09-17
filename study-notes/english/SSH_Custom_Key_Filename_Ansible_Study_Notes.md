@@ -203,13 +203,13 @@ ansible-config dump --only-changed
 Test one managed node:
 
 ```bash
-ansible node1 -m ansible.builtin.ping
+ansible node1 -m ping
 ```
 
 Test the complete three-tier group:
 
 ```bash
-ansible three_tier_app -m ansible.builtin.ping
+ansible three_tier_app -m ping
 ```
 
 ## Security recommendations

@@ -52,7 +52,7 @@ Suppose Apache is already installed and a playbook contains:
 
 ```yaml
 - name: Make sure Apache is installed
-  ansible.builtin.dnf:
+  dnf:
     name: httpd
     state: present
 ```
@@ -87,7 +87,7 @@ Example:
 
 ```yaml
 - name: Install Apache
-  ansible.builtin.dnf:
+  dnf:
     name: httpd
     state: present
 ```
@@ -242,7 +242,7 @@ Example:
 
 ```yaml
 - name: Install Apache only on Red Hat systems
-  ansible.builtin.dnf:
+  dnf:
     name: httpd
     state: present
   when: ansible_os_family == "RedHat"
@@ -413,7 +413,7 @@ data=crash
 
 ## 9. Why `ping` Usually Does Not Produce Yellow
 
-The `ansible.builtin.ping` module normally tests Ansible connectivity/module execution.
+The `ping` module normally tests Ansible connectivity/module execution.
 
 It does not normally modify the managed system.
 
@@ -428,11 +428,11 @@ and appears green.
 To naturally see yellow `changed` output, modules that modify system state are more useful, such as:
 
 ```text
-ansible.builtin.dnf
-ansible.builtin.file
-ansible.builtin.user
-ansible.builtin.copy
-ansible.builtin.service
+dnf
+file
+user
+copy
+service
 ```
 
 For example, creating a directory that does not exist can produce `changed`.

@@ -194,13 +194,13 @@ ansible-config dump --only-changed
 Aik managed node ko test karein:
 
 ```bash
-ansible node1 -m ansible.builtin.ping
+ansible node1 -m ping
 ```
 
 Poore three-tier group ko test karein:
 
 ```bash
-ansible three_tier_app -m ansible.builtin.ping
+ansible three_tier_app -m ping
 ```
 
 ## Security recommendations

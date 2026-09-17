@@ -73,7 +73,7 @@ $
 The fully qualified module name can also be used:
 
 ```bash
-ansible all -m ansible.builtin.copy \
+ansible all -m copy \
   -a 'content="Hello\n" dest=/tmp/hello.txt' \
   -i ./automation/inventory/nodes
 ```
@@ -151,7 +151,7 @@ Line 3
 ## Add ownership and permissions
 
 ```bash
-ansible all -m ansible.builtin.copy \
+ansible all -m copy \
   -a 'content="Hello\n" dest=/tmp/hello.txt owner=ansibleadmin group=ansibleadmin mode=0644' \
   -i ./automation/inventory/nodes
 ```
@@ -181,7 +181,7 @@ Whether an escape sequence is interpreted can depend on the shell, quoting, YAML
   hosts: all
   tasks:
     - name: Write Hello followed by a newline
-      ansible.builtin.copy:
+      copy:
         content: "Hello\n"
         dest: /tmp/hello.txt
         owner: ansibleadmin

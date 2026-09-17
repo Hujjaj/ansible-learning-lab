@@ -299,7 +299,7 @@ Ya playbook mein enable karein:
 
   tasks:
     - name: Install Apache
-      ansible.builtin.dnf:
+      dnf:
         name: httpd
         state: present
 ```

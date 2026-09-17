@@ -5,7 +5,7 @@
 These notes cover the exact Ansible concepts practiced in the lab:
 
 - How to get help/documentation for Ansible modules with `ansible-doc`
-- How to use the `ansible.builtin.ping` module
+- How to use the `ping` module
 - How to pass module arguments in an ad-hoc command with `-a`
 - How `data=hello` and `data=crash` behave
 - How to use a temporary/static inventory file with `-i`
@@ -45,7 +45,7 @@ ansible-doc ping
 or using the Fully Qualified Collection Name (FQCN):
 
 ```bash
-ansible-doc ansible.builtin.ping
+ansible-doc ping
 ```
 
 ---
@@ -55,13 +55,13 @@ ansible-doc ansible.builtin.ping
 ### View full documentation for a module
 
 ```bash
-ansible-doc ansible.builtin.ping
+ansible-doc ping
 ```
 
 ### View short module syntax/options
 
 ```bash
-ansible-doc -s ansible.builtin.ping
+ansible-doc -s ping
 ```
 
 The `-s` option is very useful when you mainly want to see:
@@ -105,7 +105,7 @@ primarily checks network reachability using ICMP.
 Ansible ping:
 
 ```bash
-ansible web -m ansible.builtin.ping
+ansible web -m ping
 ```
 
 checks whether Ansible can successfully communicate with the managed host and execute the module there.
@@ -721,7 +721,7 @@ ansible web -m ping
 The fully qualified module name is:
 
 ```bash
-ansible web -m ansible.builtin.ping
+ansible web -m ping
 ```
 
 For ad-hoc practice, short names are convenient.
@@ -730,7 +730,7 @@ For playbooks and documentation, using the FQCN is often clearer:
 
 ```yaml
 - name: Test managed host
-  ansible.builtin.ping:
+  ping:
 ```
 
 ---
@@ -839,13 +839,13 @@ ls -l
 ## Documentation
 
 ```bash
-ansible-doc ansible.builtin.ping
+ansible-doc ping
 ```
 
 Full help.
 
 ```bash
-ansible-doc -s ansible.builtin.ping
+ansible-doc -s ping
 ```
 
 Short syntax/options.

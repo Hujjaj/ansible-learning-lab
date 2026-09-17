@@ -7,7 +7,7 @@
 | Part | Meaning | Example |
 |---|---|---|
 | `TARGET` | Host/group/pattern | `three_tier_app` |
-| `-m` | Module | `-m ansible.builtin.file` |
+| `-m` | Module | `-m file` |
 | `-a` | Module arguments | `-a "path=/tmp/lab state=directory"` |
 | `-i` | Inventory | `-i ./automation/inventory/nodes` |
 | `-b` | Become/sudo | `-b` |
@@ -84,7 +84,7 @@ ansible TARGET -m MODULE -a "ARGUMENT=value ..." -i INVENTORY
 | `src` | Source for links | `/opt/app/current` |
 
 ```bash
-ansible three_tier_app -m ansible.builtin.file -a "path=/tmp/ansible-lab state=directory mode=0755" -i ./automation/inventory/nodes
+ansible three_tier_app -m file -a "path=/tmp/ansible-lab state=directory mode=0755" -i ./automation/inventory/nodes
 ```
 
 Memory tip: `directory` means the directory must exist; `absent` means it must not exist.
@@ -103,7 +103,7 @@ Memory tip: `directory` means the directory must exist; `absent` means it must n
 | `backup` | Backup old destination before replacement |
 
 ```bash
-ansible three_tier_app -m ansible.builtin.copy -a 'content="Hello from Ansible\n" dest=/tmp/hello.txt mode=0644' -i ./automation/inventory/nodes
+ansible three_tier_app -m copy -a 'content="Hello from Ansible\n" dest=/tmp/hello.txt mode=0644' -i ./automation/inventory/nodes
 ```
 
 ---
@@ -140,7 +140,7 @@ ansible all -m shell -a 'ps -ef | grep "[s]shd"' -i ./automation/inventory/nodes
 | `update_cache` | Refresh metadata | `yes` |
 
 ```bash
-ansible all -m ansible.builtin.dnf -a "name=httpd state=present" -b -i ./automation/inventory/nodes
+ansible all -m dnf -a "name=httpd state=present" -b -i ./automation/inventory/nodes
 ```
 
 `dnf` is especially relevant to RHEL/Rocky. `package` provides a more generic package-management interface.
@@ -158,7 +158,7 @@ ansible all -m ansible.builtin.dnf -a "name=httpd state=present" -b -i ./automat
 | `masked` | Mask/unmask unit (`systemd_service`) | `true`, `false` |
 
 ```bash
-ansible all -m ansible.builtin.service -a "name=httpd state=started enabled=yes" -b -i ./automation/inventory/nodes
+ansible all -m service -a "name=httpd state=started enabled=yes" -b -i ./automation/inventory/nodes
 ```
 
 ---
@@ -177,13 +177,13 @@ ansible all -m ansible.builtin.service -a "name=httpd state=started enabled=yes"
 | `create_home` | Create home directory |
 
 ```bash
-ansible all -m ansible.builtin.user -a "name=devops state=present shell=/bin/bash create_home=yes" -b -i ./automation/inventory/nodes
+ansible all -m user -a "name=devops state=present shell=/bin/bash create_home=yes" -b -i ./automation/inventory/nodes
 ```
 
 Group:
 
 ```bash
-ansible all -m ansible.builtin.group -a "name=devops state=present" -b -i ./automation/inventory/nodes
+ansible all -m group -a "name=devops state=present" -b -i ./automation/inventory/nodes
 ```
 
 ---
@@ -221,7 +221,7 @@ ansible all -m stat -a "path=/etc/ssh/sshd_config" -i ./automation/inventory/nod
 Example:
 
 ```bash
-ansible all -m ansible.builtin.lineinfile -a 'path=/tmp/app.conf regexp="^ENV=" line="ENV=production" create=yes' -i ./automation/inventory/nodes
+ansible all -m lineinfile -a 'path=/tmp/app.conf regexp="^ENV=" line="ENV=production" create=yes' -i ./automation/inventory/nodes
 ```
 
 ---
@@ -256,13 +256,13 @@ fetch → Managed Node → Control Node
 Cron example:
 
 ```bash
-ansible all -m ansible.builtin.cron -a 'name="daily backup" minute="0" hour="2" job="/opt/backup.sh"' -b -i ./automation/inventory/nodes
+ansible all -m cron -a 'name="daily backup" minute="0" hour="2" job="/opt/backup.sh"' -b -i ./automation/inventory/nodes
 ```
 
 HTTP health check:
 
 ```bash
-ansible web -m ansible.builtin.uri -a "url=http://localhost status_code=200" -i ./automation/inventory/nodes
+ansible web -m uri -a "url=http://localhost status_code=200" -i ./automation/inventory/nodes
 ```
 
 ---
@@ -330,7 +330,7 @@ ansible web -m ansible.builtin.uri -a "url=http://localhost status_code=200" -i 
 Example:
 
 ```bash
-ansible three_tier_app -m ansible.builtin.file -a "path=/tmp/lab state=directory mode=0755" -i ./automation/inventory/nodes
+ansible three_tier_app -m file -a "path=/tmp/lab state=directory mode=0755" -i ./automation/inventory/nodes
 ```
 
 ```text
@@ -348,21 +348,21 @@ VERIFY → ls -ld /tmp/lab
 Full documentation:
 
 ```bash
-ansible-doc ansible.builtin.file
+ansible-doc file
 ```
 
 Short option reference:
 
 ```bash
-ansible-doc -s ansible.builtin.file
+ansible-doc -s file
 ```
 
 Examples:
 
 ```bash
-ansible-doc -s ansible.builtin.dnf
-ansible-doc -s ansible.builtin.service
-ansible-doc -s ansible.builtin.user
+ansible-doc -s dnf
+ansible-doc -s service
+ansible-doc -s user
 ```
 
 > **Best rule:** Know which module solves the problem, memorize its most common arguments, and use `ansible-doc` for the rest.

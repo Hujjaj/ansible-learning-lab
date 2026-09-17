@@ -24,7 +24,7 @@ ansible TARGET -m MODULE -a "ARGUMENTS" -i INVENTORY
 ## 2. Ping Module
 
 ```bash
-ansible web -m ansible.builtin.ping -i ./automation/inventory/nodes
+ansible web -m ping -i ./automation/inventory/nodes
 ```
 
 Ansible `ping` is not ICMP ping. It verifies that Ansible can connect and execute its module successfully.
@@ -130,7 +130,7 @@ ansible-inventory --host node1 -i ./automation/inventory/nodes
 ## 8. Hostname and FQDN Lab
 
 ```bash
-ansible three_tier_app -m ansible.builtin.command -a "hostname" -i ./automation/inventory/nodes
+ansible three_tier_app -m command -a "hostname" -i ./automation/inventory/nodes
 ```
 
 Your nodes returned their full configured names:
@@ -144,7 +144,7 @@ node3.nitclasses.com
 FQDN:
 
 ```bash
-ansible three_tier_app -m ansible.builtin.command -a "hostname -f" -i ./automation/inventory/nodes
+ansible three_tier_app -m command -a "hostname -f" -i ./automation/inventory/nodes
 ```
 
 Here `-f` belongs to the Linux `hostname` command, not Ansible.
@@ -165,14 +165,14 @@ hostnamectl
 ## 9. command Module
 
 ```bash
-ansible three_tier_app -m ansible.builtin.command -a "hostname -f" -i ./automation/inventory/nodes
+ansible three_tier_app -m command -a "hostname -f" -i ./automation/inventory/nodes
 ```
 
 Breakdown:
 
 ```text
 three_tier_app             → target
-ansible.builtin.command    → module
+command    → module
 hostname -f                → command being executed
 -i .../nodes               → inventory
 ```
@@ -186,7 +186,7 @@ The `command` module can report `CHANGED` even for a read-only command such as `
 Your lab command:
 
 ```bash
-ansible three_tier_app -m ansible.builtin.file -a "path=/tmp/ansible-lab state=directory" -i ./automation/inventory/nodes
+ansible three_tier_app -m file -a "path=/tmp/ansible-lab state=directory" -i ./automation/inventory/nodes
 ```
 
 First run:
@@ -203,7 +203,7 @@ Reason: `/tmp/ansible-lab` did not exist, so Ansible created it.
 You ran the exact same command again:
 
 ```bash
-ansible three_tier_app -m ansible.builtin.file -a "path=/tmp/ansible-lab state=directory" -i ./automation/inventory/nodes
+ansible three_tier_app -m file -a "path=/tmp/ansible-lab state=directory" -i ./automation/inventory/nodes
 ```
 
 Second run:
@@ -268,7 +268,7 @@ secontext = unconfined_u:object_r:user_tmp_t:s0
 You ran:
 
 ```bash
-ansible three_tier_app -m ansible.builtin.file -a "path=/tmp/ansible-lab state=absent" -i ./automation/inventory/nodes
+ansible three_tier_app -m file -a "path=/tmp/ansible-lab state=absent" -i ./automation/inventory/nodes
 ```
 
 Result:
@@ -302,26 +302,26 @@ Note: `state=touch` can update timestamps on an existing file, so it is not the 
 ## 15. Create an Empty File
 
 ```bash
-ansible three_tier_app -m ansible.builtin.file -a "path=/tmp/ansible-test.txt state=touch" -i ./automation/inventory/nodes
+ansible three_tier_app -m file -a "path=/tmp/ansible-test.txt state=touch" -i ./automation/inventory/nodes
 ```
 
 Verify:
 
 ```bash
-ansible three_tier_app -m ansible.builtin.command -a "ls -l /tmp/ansible-test.txt" -i ./automation/inventory/nodes
+ansible three_tier_app -m command -a "ls -l /tmp/ansible-test.txt" -i ./automation/inventory/nodes
 ```
 
 ## 16. Create a File with Content
 
 ```bash
-ansible three_tier_app -m ansible.builtin.copy -a 'content="Hello from Ansible
+ansible three_tier_app -m copy -a 'content="Hello from Ansible
 " dest=/tmp/ansible-test.txt' -i ./automation/inventory/nodes
 ```
 
 Verify:
 
 ```bash
-ansible three_tier_app -m ansible.builtin.command -a "cat /tmp/ansible-test.txt" -i ./automation/inventory/nodes
+ansible three_tier_app -m command -a "cat /tmp/ansible-test.txt" -i ./automation/inventory/nodes
 ```
 
 Run the same `copy` command again. If the file already has exactly that content, it should normally report `changed: false`.
@@ -329,19 +329,19 @@ Run the same `copy` command again. If the file already has exactly that content,
 ## 17. Directory with Permissions
 
 ```bash
-ansible three_tier_app -m ansible.builtin.file -a "path=/tmp/devops state=directory mode=0755" -i ./automation/inventory/nodes
+ansible three_tier_app -m file -a "path=/tmp/devops state=directory mode=0755" -i ./automation/inventory/nodes
 ```
 
 Verify:
 
 ```bash
-ansible three_tier_app -m ansible.builtin.command -a "ls -ld /tmp/devops" -i ./automation/inventory/nodes
+ansible three_tier_app -m command -a "ls -ld /tmp/devops" -i ./automation/inventory/nodes
 ```
 
 ## 18. Delete a File
 
 ```bash
-ansible three_tier_app -m ansible.builtin.file -a "path=/tmp/ansible-test.txt state=absent" -i ./automation/inventory/nodes
+ansible three_tier_app -m file -a "path=/tmp/ansible-test.txt state=absent" -i ./automation/inventory/nodes
 ```
 
 If it exists: `changed=true`.  
@@ -370,7 +370,7 @@ For failures, inspect fields such as `msg`, `rc`, `stdout`, and `stderr`.
 Create:
 
 ```bash
-ansible three_tier_app -m ansible.builtin.file -a "path=/tmp/ansible-practice state=directory mode=0755" -i ./automation/inventory/nodes
+ansible three_tier_app -m file -a "path=/tmp/ansible-practice state=directory mode=0755" -i ./automation/inventory/nodes
 ```
 
 Run it again and observe idempotency.
@@ -378,37 +378,37 @@ Run it again and observe idempotency.
 Verify:
 
 ```bash
-ansible three_tier_app -m ansible.builtin.command -a "ls -ld /tmp/ansible-practice" -i ./automation/inventory/nodes
+ansible three_tier_app -m command -a "ls -ld /tmp/ansible-practice" -i ./automation/inventory/nodes
 ```
 
 Add content:
 
 ```bash
-ansible three_tier_app -m ansible.builtin.copy -a 'content="Ansible practice lab
+ansible three_tier_app -m copy -a 'content="Ansible practice lab
 " dest=/tmp/ansible-practice/readme.txt' -i ./automation/inventory/nodes
 ```
 
 Read it:
 
 ```bash
-ansible three_tier_app -m ansible.builtin.command -a "cat /tmp/ansible-practice/readme.txt" -i ./automation/inventory/nodes
+ansible three_tier_app -m command -a "cat /tmp/ansible-practice/readme.txt" -i ./automation/inventory/nodes
 ```
 
 Clean up:
 
 ```bash
-ansible three_tier_app -m ansible.builtin.file -a "path=/tmp/ansible-practice state=absent" -i ./automation/inventory/nodes
+ansible three_tier_app -m file -a "path=/tmp/ansible-practice state=absent" -i ./automation/inventory/nodes
 ```
 
 ## 21. Modules Practiced
 
 | Module | Purpose |
 |---|---|
-| `ansible.builtin.ping` | Test Ansible connectivity/module execution |
-| `ansible.builtin.command` | Execute commands |
-| `ansible.builtin.debug` | Display variables/messages |
-| `ansible.builtin.file` | Manage files/directories/permissions |
-| `ansible.builtin.copy` | Copy files or manage file content |
+| `ping` | Test Ansible connectivity/module execution |
+| `command` | Execute commands |
+| `debug` | Display variables/messages |
+| `file` | Manage files/directories/permissions |
+| `copy` | Copy files or manage file content |
 
 ## 22. Command-Line Options
 

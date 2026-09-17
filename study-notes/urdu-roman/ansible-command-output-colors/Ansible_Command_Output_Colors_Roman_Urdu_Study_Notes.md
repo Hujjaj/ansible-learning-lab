@@ -54,7 +54,7 @@ Agar Apache pehle se installed hai aur playbook mein ho:
 
 ```yaml
 - name: Make sure Apache is installed
-  ansible.builtin.dnf:
+  dnf:
     name: httpd
     state: present
 ```
@@ -89,7 +89,7 @@ Example:
 
 ```yaml
 - name: Install Apache
-  ansible.builtin.dnf:
+  dnf:
     name: httpd
     state: present
 ```
@@ -244,7 +244,7 @@ Example:
 
 ```yaml
 - name: Install Apache only on Red Hat systems
-  ansible.builtin.dnf:
+  dnf:
     name: httpd
     state: present
   when: ansible_os_family == "RedHat"
@@ -425,7 +425,7 @@ use karke generate ki gayi thi.
 
 ## 9. `ping` Normally Yellow Kyun Nahi Dikhata?
 
-`ansible.builtin.ping` module normally Ansible connectivity aur module execution test karta hai.
+`ping` module normally Ansible connectivity aur module execution test karta hai.
 
 Yeh aam tor par managed system ko modify nahi karta.
 
@@ -440,11 +440,11 @@ hota hai aur green nazar aata hai.
 Yellow `changed` naturally dekhne ke liye aise modules useful hain jo system state modify karte hain:
 
 ```text
-ansible.builtin.dnf
-ansible.builtin.file
-ansible.builtin.user
-ansible.builtin.copy
-ansible.builtin.service
+dnf
+file
+user
+copy
+service
 ```
 
 Misal ke taur par agar aap ek nayi directory create karte hain jo pehle exist nahi karti, to Ansible `changed` dikha sakta hai.

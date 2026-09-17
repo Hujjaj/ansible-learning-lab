@@ -6,7 +6,7 @@
 In notes mein hum wohi Ansible concepts cover kar rahe hain jo lab mein practically run kiye gaye:
 
 - `ansible-doc` se module help/documentation lena
-- `ansible.builtin.ping` module ko samajhna
+- `ping` module ko samajhna
 - Ad-hoc command mein `-a` ke through module arguments dena
 - `data=hello` aur `data=crash` ka behavior
 - Temporary/static inventory ko `-i` ke saath use karna
@@ -44,7 +44,7 @@ ansible-doc ping
 ya FQCN ke saath:
 
 ```bash
-ansible-doc ansible.builtin.ping
+ansible-doc ping
 ```
 
 ---
@@ -54,13 +54,13 @@ ansible-doc ansible.builtin.ping
 ### Full documentation dekhne ke liye
 
 ```bash
-ansible-doc ansible.builtin.ping
+ansible-doc ping
 ```
 
 ### Short syntax/options dekhne ke liye
 
 ```bash
-ansible-doc -s ansible.builtin.ping
+ansible-doc -s ping
 ```
 
 `-s` bohat useful hai jab aap mainly yeh dekhna chahte hon:
@@ -104,7 +104,7 @@ yeh mainly network reachability check karta hai.
 Ansible ping:
 
 ```bash
-ansible web -m ansible.builtin.ping
+ansible web -m ping
 ```
 
 yeh check karta hai ke Ansible managed host ke saath successfully communicate kar sakta hai aur module execute kar sakta hai.
@@ -695,7 +695,7 @@ ansible web -m ping
 Full module name:
 
 ```bash
-ansible web -m ansible.builtin.ping
+ansible web -m ping
 ```
 
 Ad-hoc practice mein short name convenient hai.
@@ -704,7 +704,7 @@ Playbooks aur documentation mein FQCN zyada clear hota hai:
 
 ```yaml
 - name: Test managed host
-  ansible.builtin.ping:
+  ping:
 ```
 
 ---
@@ -815,13 +815,13 @@ ls -l
 ## Documentation
 
 ```bash
-ansible-doc ansible.builtin.ping
+ansible-doc ping
 ```
 
 Full help.
 
 ```bash
-ansible-doc -s ansible.builtin.ping
+ansible-doc -s ping
 ```
 
 Short syntax/options.

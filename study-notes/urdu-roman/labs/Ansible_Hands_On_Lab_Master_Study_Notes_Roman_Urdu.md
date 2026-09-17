@@ -29,7 +29,7 @@ Example:
 
 ```bash
 ansible three_tier_app \
--m ansible.builtin.command \
+-m command \
 -a "hostname -f" \
 -i ./automation/inventory/nodes
 ```
@@ -39,7 +39,7 @@ ansible three_tier_app \
 ## 2. Ping Module se Connectivity Test
 
 ```bash
-ansible web -m ansible.builtin.ping \
+ansible web -m ping \
 -i ./automation/inventory/nodes
 ```
 
@@ -108,7 +108,7 @@ Examples:
 
 ```bash
 ansible-doc ping
-ansible-doc ansible.builtin.ping
+ansible-doc ping
 ansible-doc dnf
 ansible-doc service
 ```
@@ -274,7 +274,7 @@ Remote nodes par hostname:
 
 ```bash
 ansible three_tier_app \
--m ansible.builtin.command \
+-m command \
 -a "hostname" \
 -i ./automation/inventory/nodes
 ```
@@ -291,7 +291,7 @@ FQDN check:
 
 ```bash
 ansible three_tier_app \
--m ansible.builtin.command \
+-m command \
 -a "hostname -f" \
 -i ./automation/inventory/nodes
 ```
@@ -343,7 +343,7 @@ Is command mein:
 
 ```bash
 ansible three_tier_app \
--m ansible.builtin.command \
+-m command \
 -a "hostname -f" \
 -i ./automation/inventory/nodes
 ```
@@ -355,7 +355,7 @@ three_tier_app
       ↓
 Target group
 
-ansible.builtin.command
+command
       ↓
 Ansible module
 
@@ -382,7 +382,7 @@ Hamne chalaya:
 
 ```bash
 ansible three_tier_app \
--m ansible.builtin.file \
+-m file \
 -a "path=/tmp/ansible-lab state=directory" \
 -i ./automation/inventory/nodes
 ```
@@ -414,7 +414,7 @@ Wohi exact command dobara chalayi:
 
 ```bash
 ansible three_tier_app \
--m ansible.builtin.file \
+-m file \
 -a "path=/tmp/ansible-lab state=directory" \
 -i ./automation/inventory/nodes
 ```
@@ -512,7 +512,7 @@ Hamne chalaya:
 
 ```bash
 ansible three_tier_app \
--m ansible.builtin.file \
+-m file \
 -a "path=/tmp/ansible-lab state=absent" \
 -i ./automation/inventory/nodes
 ```
@@ -567,7 +567,7 @@ Note: `state=touch` existing file ke timestamps update kar sakta hai, is liye id
 
 ```bash
 ansible three_tier_app \
--m ansible.builtin.file \
+-m file \
 -a "path=/tmp/ansible-test.txt state=touch" \
 -i ./automation/inventory/nodes
 ```
@@ -576,7 +576,7 @@ Verify:
 
 ```bash
 ansible three_tier_app \
--m ansible.builtin.command \
+-m command \
 -a "ls -l /tmp/ansible-test.txt" \
 -i ./automation/inventory/nodes
 ```
@@ -589,7 +589,7 @@ ansible three_tier_app \
 
 ```bash
 ansible three_tier_app \
--m ansible.builtin.copy \
+-m copy \
 -a 'content="Hello from Ansible\n" dest=/tmp/ansible-test.txt' \
 -i ./automation/inventory/nodes
 ```
@@ -598,7 +598,7 @@ Verify:
 
 ```bash
 ansible three_tier_app \
--m ansible.builtin.command \
+-m command \
 -a "cat /tmp/ansible-test.txt" \
 -i ./automation/inventory/nodes
 ```
@@ -623,7 +623,7 @@ mile ga. Yeh idempotency ka acha example hai.
 
 ```bash
 ansible three_tier_app \
--m ansible.builtin.file \
+-m file \
 -a "path=/tmp/devops state=directory mode=0755" \
 -i ./automation/inventory/nodes
 ```
@@ -632,7 +632,7 @@ Verify:
 
 ```bash
 ansible three_tier_app \
--m ansible.builtin.command \
+-m command \
 -a "ls -ld /tmp/devops" \
 -i ./automation/inventory/nodes
 ```
@@ -643,7 +643,7 @@ ansible three_tier_app \
 
 ```bash
 ansible three_tier_app \
--m ansible.builtin.file \
+-m file \
 -a "path=/tmp/ansible-test.txt state=absent" \
 -i ./automation/inventory/nodes
 ```
@@ -723,7 +723,7 @@ Possible reasons:
 
 ```bash
 ansible three_tier_app \
--m ansible.builtin.file \
+-m file \
 -a "path=/tmp/ansible-practice state=directory mode=0755" \
 -i ./automation/inventory/nodes
 ```
@@ -749,7 +749,7 @@ Yahan idempotency prove hoti hai.
 
 ```bash
 ansible three_tier_app \
--m ansible.builtin.command \
+-m command \
 -a "ls -ld /tmp/ansible-practice" \
 -i ./automation/inventory/nodes
 ```
@@ -758,7 +758,7 @@ ansible three_tier_app \
 
 ```bash
 ansible three_tier_app \
--m ansible.builtin.copy \
+-m copy \
 -a 'content="Ansible practice lab\n" dest=/tmp/ansible-practice/readme.txt' \
 -i ./automation/inventory/nodes
 ```
@@ -767,7 +767,7 @@ ansible three_tier_app \
 
 ```bash
 ansible three_tier_app \
--m ansible.builtin.command \
+-m command \
 -a "cat /tmp/ansible-practice/readme.txt" \
 -i ./automation/inventory/nodes
 ```
@@ -776,7 +776,7 @@ ansible three_tier_app \
 
 ```bash
 ansible three_tier_app \
--m ansible.builtin.file \
+-m file \
 -a "path=/tmp/ansible-practice state=absent" \
 -i ./automation/inventory/nodes
 ```
@@ -787,11 +787,11 @@ ansible three_tier_app \
 
 | Module | Kaam |
 |---|---|
-| `ansible.builtin.ping` | Ansible connectivity/module execution test |
-| `ansible.builtin.command` | Managed nodes par command chalana |
-| `ansible.builtin.debug` | Variables/messages display karna |
-| `ansible.builtin.file` | Files/directories/permissions manage karna |
-| `ansible.builtin.copy` | File copy ya content manage karna |
+| `ping` | Ansible connectivity/module execution test |
+| `command` | Managed nodes par command chalana |
+| `debug` | Variables/messages display karna |
+| `file` | Files/directories/permissions manage karna |
+| `copy` | File copy ya content manage karna |
 
 ---
 
