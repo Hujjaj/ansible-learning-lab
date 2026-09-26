@@ -73,19 +73,113 @@ Common ports:
 
 ### Static website hosting
 
-Nginx can directly serve files located under its document root:
+Nginx can directly serve static files such as HTML, CSS, JavaScript, images, videos, and downloads. On Rocky Linux, its default document root is:
 
 ```text
 /usr/share/nginx/html/
 ```
 
+For example, when a user opens `http://192.168.1.154`, Nginx can read `/usr/share/nginx/html/index.html` and return it to the browser.
+
+```text
+Browser → Nginx → Static website files
+```
+
+**Suitable for:** portfolios, documentation sites, landing pages, and compiled frontend applications.
+
 ### Reverse proxy
 
-Nginx can accept requests on port `80` or `443` and forward them to an application running on a different port, such as `8080`.
+Nginx can receive a client request on port `80` or `443` and forward it to a backend application running on another port, such as `8080`.
+
+```text
+Browser → Nginx:80 → Application:8080
+```
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:8080;
+}
+```
+
+**Why use it?**
+
+- The backend port remains hidden from clients.
+- Nginx can handle HTTPS and certificates centrally.
+- Several applications can be published through one entry point.
+- Access control and logging can be managed in one place.
 
 ### Load balancing
 
-Nginx can distribute incoming requests among several backend servers, improving availability and capacity.
+Nginx can distribute incoming requests among several backend servers, improving capacity and helping prevent one server from receiving all traffic.
+
+```text
+                       → Application Server 1
+Client → Nginx         → Application Server 2
+                       → Application Server 3
+```
+
+```nginx
+upstream backend_servers {
+    server 192.168.1.154:8080;
+    server 192.168.1.185:8080;
+    server 192.168.1.190:8080;
+}
+
+location / {
+    proxy_pass http://backend_servers;
+}
+```
+
+By default, Nginx commonly uses round-robin distribution: requests are sent to the backend servers one after another.
+
+> Load balancing alone does not guarantee complete high availability. Backend health checks and a redundant load-balancer design may also be required.
+
+### HTTPS termination
+
+HTTPS termination means Nginx handles TLS encryption and decryption for clients. Nginx stores the certificate and private key, then forwards the request to the backend using HTTP or HTTPS according to the security design.
+
+```text
+Browser ──HTTPS──> Nginx ──HTTP or HTTPS──> Backend
+```
+
+```nginx
+server {
+    listen 443 ssl;
+
+    ssl_certificate /etc/nginx/certs/site.crt;
+    ssl_certificate_key /etc/nginx/certs/site.key;
+}
+```
+
+**Benefits:** centralized certificate management, secure client connections, and less TLS-processing responsibility for backend applications.
+
+> Use HTTPS between Nginx and the backend as well when end-to-end encryption is required.
+
+### Caching
+
+Nginx can save copies of frequently requested responses and serve them without contacting the backend every time.
+
+```text
+Without cache: Every request → Backend application → Database
+With cache:    Later requests → Nginx cache
+```
+
+```nginx
+proxy_cache_path /var/cache/nginx levels=1:2 keys_zone=my_cache:10m;
+
+location / {
+    proxy_cache my_cache;
+    proxy_pass http://backend_servers;
+}
+```
+
+**Benefits:** faster responses, reduced backend load, fewer database requests, and better performance during heavy traffic.
+
+> Configure caching carefully for private or frequently changing content; otherwise, users may receive stale or inappropriate cached data.
+
+### Access control
+
+Nginx can allow or deny requests based on IP address, authentication, paths, and other rules. This provides a security layer before traffic reaches the backend application.
 
 ---
 

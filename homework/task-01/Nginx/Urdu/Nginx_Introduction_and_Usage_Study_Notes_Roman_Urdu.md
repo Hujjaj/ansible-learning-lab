@@ -69,19 +69,113 @@ to Nginx aam tor par TCP port `80` par request receive karta hai aur apne docume
 
 ### Static website hosting
 
-Nginx document root mein rakhi files ko seedha serve kar sakta hai:
+Nginx HTML, CSS, JavaScript, images, videos aur downloads jaisi static files ko seedha serve kar sakta hai. Rocky Linux par iska default document root hai:
 
 ```text
 /usr/share/nginx/html/
 ```
 
+Misal ke tor par, jab user `http://192.168.1.154` open karta hai, Nginx `/usr/share/nginx/html/index.html` ko read karke browser ko bhej sakta hai.
+
+```text
+Browser → Nginx → Static website files
+```
+
+**Kahan useful hai:** portfolio, documentation website, landing page aur compiled frontend application.
+
 ### Reverse proxy
 
-Nginx port `80` ya `443` par request receive karke usay kisi application ke port, jaise `8080`, par forward kar sakta hai.
+Nginx client ki request port `80` ya `443` par receive karke usay kisi backend application ke doosre port, jaise `8080`, par forward kar sakta hai.
+
+```text
+Browser → Nginx:80 → Application:8080
+```
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:8080;
+}
+```
+
+**Isay kyun use karte hain?**
+
+- Backend port clients se hidden rehta hai.
+- Nginx HTTPS aur certificates ko centrally handle kar sakta hai.
+- Ek entry point ke peechhe multiple applications publish ki ja sakti hain.
+- Access control aur logging ek jagah manage ho sakti hai.
 
 ### Load balancing
 
-Nginx incoming requests ko multiple backend servers ke darmiyan distribute karta hai. Is se availability aur capacity improve hoti hai.
+Nginx incoming requests ko multiple backend servers ke darmiyan distribute karta hai. Is se capacity improve hoti hai aur sara traffic ek hi server par nahi jata.
+
+```text
+                       → Application Server 1
+Client → Nginx         → Application Server 2
+                       → Application Server 3
+```
+
+```nginx
+upstream backend_servers {
+    server 192.168.1.154:8080;
+    server 192.168.1.185:8080;
+    server 192.168.1.190:8080;
+}
+
+location / {
+    proxy_pass http://backend_servers;
+}
+```
+
+Nginx aam tor par default round-robin distribution use karta hai, yani requests backend servers ko bari bari bheji jati hain.
+
+> Sirf load balancing complete high availability guarantee nahi karti. Backend health checks aur redundant load-balancer design bhi zaroori ho sakte hain.
+
+### HTTPS termination
+
+HTTPS termination ka matlab hai ke Nginx clients ke liye TLS encryption aur decryption handle karta hai. Certificate aur private key Nginx par rehte hain. Phir security design ke mutabiq request backend ko HTTP ya HTTPS par forward hoti hai.
+
+```text
+Browser ──HTTPS──> Nginx ──HTTP ya HTTPS──> Backend
+```
+
+```nginx
+server {
+    listen 443 ssl;
+
+    ssl_certificate /etc/nginx/certs/site.crt;
+    ssl_certificate_key /etc/nginx/certs/site.key;
+}
+```
+
+**Faide:** certificates centrally manage hote hain, clients ko secure connection milta hai aur backend applications par TLS processing ki zimmedari kam hoti hai.
+
+> Agar end-to-end encryption required ho to Nginx aur backend ke darmiyan bhi HTTPS use karein.
+
+### Caching
+
+Nginx frequently requested responses ki copies save kar sakta hai aur har request par backend ko contact kiye baghair response de sakta hai.
+
+```text
+Cache ke baghair: Har request → Backend application → Database
+Cache ke sath:    Baad ki requests → Nginx cache
+```
+
+```nginx
+proxy_cache_path /var/cache/nginx levels=1:2 keys_zone=my_cache:10m;
+
+location / {
+    proxy_cache my_cache;
+    proxy_pass http://backend_servers;
+}
+```
+
+**Faide:** response fast hota hai, backend ka load kam hota hai, database requests kam hoti hain aur heavy traffic mein performance improve hoti hai.
+
+> Private ya frequently changing content ke liye caching ko ehtiyat se configure karein, warna users ko purana ya ghalat cached data mil sakta hai.
+
+### Access control
+
+Nginx IP address, authentication, URL paths aur doosre rules ki bunyaad par requests ko allow ya deny kar sakta hai. Is tarah backend application se pehle ek security layer milti hai.
 
 ---
 
