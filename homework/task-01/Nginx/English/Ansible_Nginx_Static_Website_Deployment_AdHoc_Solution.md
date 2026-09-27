@@ -298,6 +298,8 @@ ansible three_tier_app --limit node1 -m uri -a \
 "url=http://localhost/space-science/ status_code=200"
 ```
 
+[command explanation](./Ansible_URI_Status_Code_Study_Notes_English.md)
+
 ### Step 16: Test from a browser
 
 ```text
