@@ -1,35 +1,39 @@
-# Roman Urdu Solution: Nginx par Static Website Ansible Ad-Hoc Commands se Deploy Karein
+# Ansible Ad-Hoc Lab: Nginx par Static Website Deploy Karein — Roman Urdu
+
+Yeh revised solution un commands aur paths ke mutabiq hai jo Rocky Linux lab mein successfully kaam kar chuke hain. Pehle `node1` (`192.168.1.154`) par test karein, phir tamam managed nodes par deploy karein.
 
 ## Fehrist
 
-1. [Deployment Flow](#1-deployment-flow)
-2. [Prechecks](#2-prechecks)
-3. [node1 par Pilot Deployment](#3-node1-par-pilot-deployment)
-4. [Teenon Nodes par Deployment](#4-teenon-nodes-par-deployment)
-5. [Verification](#5-verification)
-6. [Idempotency](#6-idempotency)
-7. [Troubleshooting](#7-troubleshooting)
-8. [Cleanup](#8-cleanup)
+1. [Lab Environment](#1-lab-environment)
+2. [Sahi Document Root Ka Faisla](#2-sahi-document-root-ka-faisla)
+3. [Prechecks](#3-prechecks)
+4. [Nginx Install Aur Start Karein](#4-nginx-install-aur-start-karein)
+5. [Shuru Ka 403 Error Diagnose Karein](#5-shuru-ka-403-error-diagnose-karein)
+6. [Website Archive Inspect Karein](#6-website-archive-inspect-karein)
+7. [Website Deploy Karein](#7-website-deploy-karein)
+8. [Deployment Verify Karein](#8-deployment-verify-karein)
+9. [Teenon Nodes Par Deployment](#9-teenon-nodes-par-deployment)
+10. [Idempotency](#10-idempotency)
+11. [Troubleshooting](#11-troubleshooting)
+12. [Complete Cleanup](#12-complete-cleanup)
+13. [Ahm Learning Points](#13-ahm-learning-points)
 
 ---
 
-## 1. Deployment Flow
+## 1. Lab Environment
 
-```text
-Prechecks
-  -> Nginx aur unzip install
-  -> Nginx start aur enable
-  -> Firewall mein HTTP allow
-  -> Default page test
-  -> ZIP download aur inspect
-  -> Website extract
-  -> Permissions aur SELinux context
-  -> HTTP 200 verification
-  -> All nodes deployment
-  -> Idempotency aur cleanup
-```
-
-Project directory mein jayein:
+| Item | Value |
+|---|---|
+| Control user | `ansibleadmin` |
+| Project directory | `/home/ansibleadmin/automation` |
+| Inventory group | `three_tier_app` |
+| Pilot host | `node1` |
+| node1 IP | `192.168.1.154` |
+| Operating system | Rocky Linux 9 |
+| Active virtual host | `lawfirm.com` |
+| Active document root | `/var/www/lawfirm.com/html` |
+| Website archive | `/tmp/space-science.zip` |
+| Extraction directory | `/tmp/space-science-extracted` |
 
 ```bash
 cd /home/ansibleadmin/automation
@@ -37,293 +41,351 @@ cd /home/ansibleadmin/automation
 
 ---
 
-## 2. Prechecks
+## 2. Sahi Document Root Ka Faisla
 
-### Active configuration dekhein
+Rocky Linux mein aam default Nginx root `/usr/share/nginx/html` hota hai. Lekin is lab ka active `lawfirm.com` server block yeh root use karta hai:
+
+```text
+/var/www/lawfirm.com/html
+```
+
+Active configuration ko priority milti hai, is liye website isi path mein deploy hogi. Agar root maloom na ho:
+
+```bash
+ansible node1 -b -m shell -a \
+"nginx -T 2>/dev/null | grep -E '^[[:space:]]*root[[:space:]]'"
+```
+
+---
+
+## 3. Prechecks
 
 ```bash
 ansible --version
 ansible-config dump --only-changed
-```
-
-### Inventory graph aur target hosts dekhein
-
-```bash
 ansible-inventory --graph
 ansible three_tier_app --list-hosts
-```
-
-Expected hosts:
-
-```text
-node1
-node2
-node3
-```
-
-### Connectivity test karein
-
-```bash
 ansible three_tier_app -m ping
 ```
 
-Har node se `pong` milna chahiye.
+Expected hosts `node1`, `node2`, aur `node3` hain. Har host se `SUCCESS` aur `pong` milna chahiye.
 
 ---
 
-## 3. `node1` par Pilot Deployment
+## 4. Nginx Install Aur Start Karein
 
-### Step 1: Nginx install karein
+### Step 1: Pilot host par Nginx aur unzip install karein
 
 ```bash
-ansible three_tier_app --limit node1 -b -m dnf -a \
-"name=nginx state=present"
+ansible node1 -b -m dnf -a "name=nginx,unzip state=present"
 ```
 
-### Step 2: unzip install karein
+`state=present` missing package install karta hai. Repository mein naya build ho to DNF purane build ko current build se replace bhi kar sakta hai.
+
+### Step 2: Nginx start aur enable karein
 
 ```bash
-ansible three_tier_app --limit node1 -b -m dnf -a \
-"name=unzip state=present"
-```
-
-ZIP archive extract karne ke liye managed node par `unzip` chahiye.
-
-### Step 3: Nginx start aur enable karein
-
-```bash
-ansible three_tier_app --limit node1 -b -m service -a \
-"name=nginx state=started enabled=yes"
+ansible node1 -b -m service -a "name=nginx state=started enabled=yes"
 ```
 
 - `state=started`: service abhi running ho.
 - `enabled=yes`: reboot ke baad automatically start ho.
 
-### Step 4: Service verify karein
+### Step 3: Current state verify karein
 
 ```bash
-ansible three_tier_app --limit node1 -m command -a \
-"systemctl is-active nginx"
+ansible node1 -m command -a "systemctl is-active nginx"
 ```
 
-Expected:
+Expected result `active` hai. `service` output mein kabhi purana status snapshot bhi hota hai; yeh command current state seedha check karti hai.
 
-```text
-active
-```
-
-### Step 5: Firewall mein HTTP allow karein
+### Step 4: Firewall mein HTTP allow karein
 
 ```bash
-ansible three_tier_app --limit node1 -b -m firewalld -a \
+ansible node1 -b -m firewalld -a \
 "service=http permanent=yes immediate=yes state=enabled"
 ```
 
-### Step 6: Default Nginx page test karein
+`changed=false` ka matlab HTTP pehle se allowed tha. Yeh sahi idempotent behavior hai.
+
+### Step 5: Website root test karein
 
 ```bash
-ansible three_tier_app --limit node1 -m uri -a \
-"url=http://localhost status_code=200"
+ansible node1 -m uri -a "url=http://localhost status_code=200"
 ```
 
-Browser:
+Pehle test mein `403 Forbidden` mila. Nginx running tha lekin active document root mein index page nahi tha.
+
+---
+
+## 5. Shuru Ka 403 Error Diagnose Karein
+
+```bash
+ansible node1 -b -m command -a "ls -laZ /usr/share/nginx/html"
+ansible node1 -b -m command -a "tail -n 20 /var/log/nginx/error.log"
+```
+
+Important error yeh tha:
 
 ```text
-http://192.168.1.154
+directory index of "/var/www/lawfirm.com/html/" is forbidden
 ```
 
-### Step 7: Website ZIP download karein
+Is se asal active document root maloom hua. Woh khaali tha:
 
 ```bash
-ansible three_tier_app --limit node1 -b -m get_url -a \
+ansible node1 -b -m command -a "ls -laZ /var/www/lawfirm.com/html"
+```
+
+Temporary test page banayein:
+
+```bash
+ansible node1 -b -m copy -a \
+'content="<h1>Welcome to lawfirm.com</h1>\n<p>Deployed using Ansible.</p>\n" dest=/var/www/lawfirm.com/html/index.html owner=root group=root mode=0644'
+```
+
+SELinux context restore karke dobara test karein:
+
+```bash
+ansible node1 -b -m command -a "restorecon -Rv /var/www/lawfirm.com/html"
+ansible node1 -m uri -a \
+"url=http://localhost status_code=200 return_content=yes"
+```
+
+Status `200` prove karta hai ke Nginx, active root, permissions aur SELinux access sahi hain.
+
+---
+
+## 6. Website Archive Inspect Karein
+
+Archive pehle se na ho to download karein:
+
+```bash
+ansible node1 -m get_url -a \
 "url=https://freewebsitetemplates.com/download/space-science/ dest=/tmp/space-science.zip mode=0644"
 ```
 
-### Step 8: Download verify karein
+Extract karne se pehle inspect karein:
 
 ```bash
-ansible three_tier_app --limit node1 -m stat -a \
-"path=/tmp/space-science.zip"
-
-ansible three_tier_app --limit node1 -m command -a \
-"file /tmp/space-science.zip"
+ansible node1 -m stat -a "path=/tmp/space-science.zip"
+ansible node1 -m command -a "file /tmp/space-science.zip"
+ansible node1 -m command -a "unzip -l /tmp/space-science.zip"
 ```
 
-Result mein `Zip archive data` aana chahiye. Agar `HTML document` aaye to URL actual archive return nahi kar raha.
-
-### Step 9: ZIP structure inspect karein
-
-```bash
-ansible three_tier_app --limit node1 -m command -a \
-"unzip -l /tmp/space-science.zip"
-```
-
-`index.html` aur top-level directory ka naam note karein.
-
-### Step 10: Website extract karein
-
-```bash
-ansible three_tier_app --limit node1 -b -m unarchive -a \
-"src=/tmp/space-science.zip dest=/usr/share/nginx/html remote_src=yes creates=/usr/share/nginx/html/space-science/index.html"
-```
-
-- `remote_src=yes`: ZIP managed node par maujood hai.
-- `creates=`: `index.html` maujood ho to unnecessary extraction nahi hogi.
-
-> Agar ZIP ka directory name mukhtalif ho to `creates` path aur website URL adjust karein.
-
-### Step 11: `index.html` locate karein
-
-```bash
-ansible three_tier_app --limit node1 -b -m shell -a \
-"find /usr/share/nginx/html -name index.html -print"
-```
-
-### Step 12: Ownership aur permissions set karein
-
-```bash
-ansible three_tier_app --limit node1 -b -m file -a \
-"path=/usr/share/nginx/html/space-science state=directory owner=root group=root mode=u=rwX,g=rX,o=rX recurse=yes"
-```
-
-Capital `X` directories ko traverse permission deta hai aur normal files ko bila-wajah executable nahi banata.
-
-### Step 13: SELinux web context apply karein
-
-```bash
-ansible three_tier_app --limit node1 -b -m file -a \
-"path=/usr/share/nginx/html/space-science state=directory setype=httpd_sys_content_t recurse=yes"
-```
-
-### Step 14: Custom website test karein
-
-```bash
-ansible three_tier_app --limit node1 -m uri -a \
-"url=http://localhost/space-science/ status_code=200"
-```
-[command explanation](./Ansible_URI_Status_Code_Study_Notes_Roman_Urdu.md)
-
-Browser:
+Successful lab mein valid ZIP taqreeban 26 MB thi. Asal website yahan thi:
 
 ```text
-http://192.168.1.154/space-science/
+space-science/upload/
 ```
 
-Static files deploy karne par Nginx reload zaroori nahi, kyun ke configuration change nahi hui.
+Main page `space-science/upload/index.html` thi. License aur design-source folders Nginx ko required nahi hain.
 
 ---
 
-## 4. Teenon Nodes par Deployment
+## 7. Website Deploy Karein
 
-`node1` successful hone ke baad `--limit node1` hata dein:
+### Step 1: Temporary extraction directory banayein
 
 ```bash
-ansible three_tier_app -b -m dnf -a "name=nginx state=present"
-ansible three_tier_app -b -m dnf -a "name=unzip state=present"
+ansible node1 -b -m file -a \
+"path=/tmp/space-science-extracted state=directory mode=0755"
+```
+
+### Step 2: Archive node1 par extract karein
+
+```bash
+ansible node1 -b -m unarchive -a \
+"src=/tmp/space-science.zip dest=/tmp/space-science-extracted remote_src=yes creates=/tmp/space-science-extracted/space-science/upload/index.html"
+```
+
+- `remote_src=yes`: archive managed node par pehle se hai.
+- `creates=`: marker file ho to unnecessary extraction repeat nahi hogi.
+
+### Step 3: Sirf website contents copy karein
+
+```bash
+ansible node1 -b -m copy -a \
+"src=/tmp/space-science-extracted/space-science/upload/ dest=/var/www/lawfirm.com/html/ remote_src=yes owner=root group=root mode=preserve"
+```
+
+`upload/` ke aakhir ka trailing slash bohat important hai. Yeh directory banane ke bajaye us ke **contents** document root mein copy karta hai. Temporary test page bhi real template page se replace ho jata hai.
+
+### Step 4: SELinux contexts restore karein
+
+```bash
+ansible node1 -b -m command -a \
+"restorecon -Rv /var/www/lawfirm.com/html"
+```
+
+Lab mein copied files ka `user_tmp_t` context web-readable `httpd_sys_content_t` mein badla.
+
+### Step 5: Index verify karein
+
+```bash
+ansible node1 -m stat -a "path=/var/www/lawfirm.com/html/index.html"
+ansible node1 -b -m command -a "ls -laZ /var/www/lawfirm.com/html"
+```
+
+---
+
+## 8. Deployment Verify Karein
+
+```bash
+ansible node1 -m uri -a "url=http://localhost status_code=200"
+```
+
+Successful response mein `status: 200`, `server: nginx/1.20.1`, `content_length: 3538`, aur `changed: false` mila.
+
+[URI Explanation]
+
+Browser mein kholein:
+
+```text
+http://192.168.1.154/
+```
+
+Is deployment mein `/space-science/` use na karein. Contents seedha document root mein copy hue hain, is liye website `/` se serve hoti hai. Browser ka **Not secure** message expected hai kyun ke yeh HTTP lab hai, HTTPS nahi.
+
+```bash
+ansible node1 -m command -a "systemctl is-active nginx"
+ansible node1 -m shell -a "ss -tln | grep ':80 '"
+ansible node1 -m uri -a "url=http://localhost status_code=200"
+```
+
+---
+
+## 9. Teenon Nodes Par Deployment
+
+Pehle confirm karein ke sab nodes `/var/www/lawfirm.com/html` use karte hain. Phir:
+
+```bash
+ansible three_tier_app -b -m dnf -a "name=nginx,unzip state=present"
 ansible three_tier_app -b -m service -a "name=nginx state=started enabled=yes"
 ansible three_tier_app -b -m firewalld -a "service=http permanent=yes immediate=yes state=enabled"
-ansible three_tier_app -b -m get_url -a "url=https://freewebsitetemplates.com/download/space-science/ dest=/tmp/space-science.zip mode=0644"
-ansible three_tier_app -b -m unarchive -a "src=/tmp/space-science.zip dest=/usr/share/nginx/html remote_src=yes creates=/usr/share/nginx/html/space-science/index.html"
-ansible three_tier_app -b -m file -a "path=/usr/share/nginx/html/space-science state=directory owner=root group=root mode=u=rwX,g=rX,o=rX recurse=yes"
-ansible three_tier_app -b -m file -a "path=/usr/share/nginx/html/space-science state=directory setype=httpd_sys_content_t recurse=yes"
-```
-
----
-
-## 5. Verification
-
-```bash
-ansible three_tier_app -m command -a "systemctl is-active nginx"
-ansible three_tier_app -m shell -a "ss -tln | grep ':80 '"
-ansible three_tier_app -m stat -a "path=/usr/share/nginx/html/space-science/index.html"
-ansible three_tier_app -m command -a "ls -Zd /usr/share/nginx/html/space-science"
-ansible three_tier_app -m uri -a "url=http://localhost/space-science/ status_code=200"
+ansible three_tier_app -m get_url -a "url=https://freewebsitetemplates.com/download/space-science/ dest=/tmp/space-science.zip mode=0644"
+ansible three_tier_app -b -m file -a "path=/tmp/space-science-extracted state=directory mode=0755"
+ansible three_tier_app -b -m unarchive -a "src=/tmp/space-science.zip dest=/tmp/space-science-extracted remote_src=yes creates=/tmp/space-science-extracted/space-science/upload/index.html"
+ansible three_tier_app -b -m copy -a "src=/tmp/space-science-extracted/space-science/upload/ dest=/var/www/lawfirm.com/html/ remote_src=yes owner=root group=root mode=preserve"
+ansible three_tier_app -b -m command -a "restorecon -Rv /var/www/lawfirm.com/html"
+ansible three_tier_app -m uri -a "url=http://localhost status_code=200"
 ```
 
 Browser URLs:
 
 ```text
-http://192.168.1.154/space-science/
-http://192.168.1.185/space-science/
-http://192.168.1.190/space-science/
+http://192.168.1.154/
+http://192.168.1.185/
+http://192.168.1.190/
 ```
 
 ---
 
-## 6. Idempotency
+## 10. Idempotency
 
-Deployment commands dobara chalayein. Expected behavior:
+| Operation | Second run par expected result |
+|---|---|
+| `dnf state=present` | Packages sahi hon to `changed=false` |
+| `service state=started enabled=yes` | Already running aur enabled ho to `changed=false` |
+| `firewalld state=enabled` | HTTP pehle se allowed ho to `changed=false` |
+| `get_url` | Remote file same ho to aam tor par `changed=false` |
+| `unarchive creates=...` | Marker ho to extraction skip |
+| `copy` | Contents match hon to `changed=false` |
+| `uri` | Verification; aam tor par `changed=false` |
 
-- Packages already installed hon to `changed=false`.
-- Nginx running aur enabled ho to `changed=false`.
-- HTTP pehle se allowed ho to `changed=false`.
-- Remote archive change na ho to `get_url` aam tor par `changed=false`.
-- `creates` path ki wajah se extraction repeat nahi hogi.
-- Correct permissions aur context hon to `file` task `changed=false`.
-- `uri` sirf verification karega.
-
-Idempotency ka matlab hai ke repeated automation required state ko maintain kare aur unnecessary changes na kare.
-
----
-
-## 7. Troubleshooting
-
-### ZIP ki jagah HTML download ho
-
-```bash
-ansible three_tier_app --limit node1 -m command -a "file /tmp/space-science.zip"
-```
-
-### `index.html` expected path par na ho
-
-```bash
-ansible three_tier_app --limit node1 -m command -a "unzip -l /tmp/space-science.zip"
-ansible three_tier_app --limit node1 -b -m shell -a "find /usr/share/nginx/html -name index.html -print"
-```
-
-### Browser connect na kare
-
-```bash
-ansible three_tier_app --limit node1 -m command -a "systemctl is-active nginx"
-ansible three_tier_app --limit node1 -m command -a "ss -tln"
-ansible three_tier_app --limit node1 -b -m command -a "firewall-cmd --list-services"
-```
-
-### HTTP 403 aaye
-
-```bash
-ansible three_tier_app --limit node1 -m command -a "namei -l /usr/share/nginx/html/space-science/index.html"
-ansible three_tier_app --limit node1 -m command -a "ls -lZ /usr/share/nginx/html/space-science/index.html"
-```
-
-### Nginx logs dekhein
-
-```bash
-ansible three_tier_app --limit node1 -b -m command -a "journalctl -u nginx --no-pager -n 30"
-```
+`command` module read-only command chala kar bhi aksar `CHANGED` dikhata hai. Is ka matlab zaroori nahi ke host modify hua hai.
 
 ---
 
-## 8. Cleanup
+## 11. Troubleshooting
 
-Website aur ZIP remove karein:
-
-```bash
-ansible three_tier_app -b -m file -a "path=/usr/share/nginx/html/space-science state=absent"
-ansible three_tier_app -b -m file -a "path=/tmp/space-science.zip state=absent"
-```
-
-Optional Nginx aur unzip removal:
+### HTTP 403 Forbidden
 
 ```bash
-ansible three_tier_app -b -m dnf -a "name=nginx state=absent"
-ansible three_tier_app -b -m dnf -a "name=unzip state=absent"
+ansible node1 -b -m command -a "tail -n 20 /var/log/nginx/error.log"
+ansible node1 -b -m command -a "ls -laZ /var/www/lawfirm.com/html"
+ansible node1 -b -m shell -a "nginx -T 2>/dev/null | grep -E '^[[:space:]]*root[[:space:]]'"
 ```
 
-HTTP rule sirf tab remove karein jab koi doosri website port 80 use na kar rahi ho:
+403 aam tor par missing index, directory permissions, ya ghalat SELinux context ki wajah se aata hai.
+
+### `/space-science/` par 404
+
+`http://192.168.1.154/` use karein. Site document root par install hui hai.
+
+### Port 80 pehle se use ho
 
 ```bash
-ansible three_tier_app -b -m firewalld -a \
-"service=http permanent=yes immediate=yes state=disabled"
+ansible node1 -b -m shell -a "ss -tlnp | grep ':80 '"
 ```
 
+### ZIP asal mein HTML ho
+
+```bash
+ansible node1 -m command -a "file /tmp/space-science.zip"
+```
+
+Output ZIP archive data hona chahiye.
+
+### Nginx configuration validate karein
+
+```bash
+ansible node1 -b -m command -a "nginx -t"
+```
+
+---
+
+## 12. Complete Cleanup
+
+Yeh commands pilot host ko completely reset karte hain. Custom site aur Nginx configuration delete hogi, is liye sirf full cleanup ke waqt use karein.
+
+```bash
+# Nginx stop aur disable karein
+ansible all -b -m service -a "name=nginx state=stopped enabled=no"
+
+# Nginx packages remove karein
+ansible all -b -m dnf -a "name=nginx,nginx-core,nginx-filesystem state=absent"
+
+# Optional: unzip sirf is lab ke liye tha to remove karein
+ansible all -b -m dnf -a "name=unzip state=absent"
+
+# Custom site aur remaining Nginx configuration remove karein
+ansible all -b -m file -a "path=/var/www/lawfirm.com state=absent"
+ansible all -b -m file -a "path=/etc/nginx state=absent"
+
+# Temporary deployment files remove karein
+ansible all -b -m file -a "path=/tmp/space-science-extracted state=absent"
+ansible all -b -m file -a "path=/tmp/space-science.zip state=absent"
+
+# HTTP firewall rule sirf tab remove karein jab doosri site ko port 80 na chahiye
+ansible all -b -m firewalld -a "service=http permanent=yes immediate=yes state=disabled"
+```
+
+Cleanup verify karein:
+
+```bash
+ansible all -m command -a "rpm -q nginx nginx-core nginx-filesystem"
+ansible all -m stat -a "path=/var/www/lawfirm.com"
+ansible all -m stat -a "path=/tmp/space-science.zip"
+ansible all -m stat -a "path=/tmp/space-science-extracted"
+ansible all -b -m shell -a "ss -tlnp | grep ':80 ' || true"
+```
+
+Expected: packages `not installed`, removed paths par `exists: false`, aur port 80 par Nginx listen na kare.
+
+`node1` ko `three_tier_app` se sirf tab replace karein jab kisi managed node par doosri required website na chal rahi ho.
+
+---
+
+## 13. Ahm Learning Points
+
+1. Default root assume karne ke bajaye active Nginx configuration inspect karein.
+2. `403` ka matlab server ne jawab diya lekin content serve nahi kar saka.
+3. Unknown archive extract karne se pehle inspect karein.
+4. Sirf asal website wali directory deploy karein.
+5. `copy` source ka trailing slash directory aur us ke contents mein farq karta hai.
+6. SELinux system par `/tmp` se copy ke baad `restorecon` chalayein.
+7. Tamam nodes se pehle `node1` par pilot test karein.
+8. Service status ke saath `uri` se HTTP bhi verify karein.
+9. Cleanup ko exact lab paths tak limit rakhein.
+10. Tested ad-hoc workflow ko repeatable automation ke liye playbook mein convert karein.
