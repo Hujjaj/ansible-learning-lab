@@ -60,15 +60,37 @@ ansible node1 -b -m shell -a \
 
 ## 3. Prechecks
 
+### Step 1: Confirm the active Ansible configuration
+
 ```bash
 ansible --version
 ansible-config dump --only-changed
+```
+
+Confirm that Ansible is reading the expected `ansible.cfg` and inventory.
+
+### Step 2: Inspect the inventory
+
+```bash
 ansible-inventory --graph
 ansible three_tier_app --list-hosts
+```
+
+Expected hosts:
+
+```text
+node1
+node2
+node3
+```
+
+### Step 3: Test connectivity
+
+```bash
 ansible three_tier_app -m ping
 ```
 
-Expected hosts are `node1`, `node2`, and `node3`. Each host should return `SUCCESS` and `pong`.
+Each host should return `SUCCESS` and `pong`.
 
 ---
 
@@ -122,10 +144,19 @@ The first lab test returned `403 Forbidden`. Nginx was running, but it had no in
 
 ## 5. Diagnose the Initial 403
 
+### Step 1: Inspect the standard Nginx directory
+
 Inspect the standard directory and the Nginx error log:
 
 ```bash
 ansible node1 -b -m command -a "ls -laZ /usr/share/nginx/html"
+```
+
+This directory contained Rocky Linux's standard Nginx files, but it was not the active root for the `lawfirm.com` server block.
+
+### Step 2: Read the Nginx error log
+
+```bash
 ansible node1 -b -m command -a "tail -n 20 /var/log/nginx/error.log"
 ```
 
@@ -137,9 +168,13 @@ directory index of "/var/www/lawfirm.com/html/" is forbidden
 
 This exposed the real active document root. It was empty:
 
+### Step 3: Inspect the active document root
+
 ```bash
 ansible node1 -b -m command -a "ls -laZ /var/www/lawfirm.com/html"
 ```
+
+### Step 4: Create a temporary test page
 
 Create a temporary test page:
 
@@ -148,10 +183,17 @@ ansible node1 -b -m copy -a \
 'content="<h1>Welcome to lawfirm.com</h1>\n<p>Deployed using Ansible.</p>\n" dest=/var/www/lawfirm.com/html/index.html owner=root group=root mode=0644'
 ```
 
-Restore SELinux contexts and test again:
+### Step 5: Restore SELinux contexts
 
 ```bash
 ansible node1 -b -m command -a "restorecon -Rv /var/www/lawfirm.com/html"
+```
+
+[restorecon explanation](./Ansible_Restorecon_AdHoc_Command_Study_Notes.md)
+
+### Step 6: Test the temporary page
+
+```bash
 ansible node1 -m uri -a \
 "url=http://localhost status_code=200 return_content=yes"
 ```
@@ -162,6 +204,8 @@ Status `200` proves that Nginx, the active root, permissions, and SELinux access
 
 ## 6. Inspect the Website Archive
 
+### Step 1: Download the template
+
 Download the template if it is not already present:
 
 ```bash
@@ -169,11 +213,25 @@ ansible node1 -m get_url -a \
 "url=https://freewebsitetemplates.com/download/space-science/ dest=/tmp/space-science.zip mode=0644"
 ```
 
-Inspect it before extraction:
+### Step 2: Confirm that the archive exists
 
 ```bash
 ansible node1 -m stat -a "path=/tmp/space-science.zip"
+```
+
+Look for `exists: true` and `mimetype: application/zip`.
+
+### Step 3: Confirm the file type
+
+```bash
 ansible node1 -m command -a "file /tmp/space-science.zip"
+```
+
+The result should say `Zip archive data`, not `HTML document`.
+
+### Step 4: Inspect the archive layout
+
+```bash
 ansible node1 -m command -a "unzip -l /tmp/space-science.zip"
 ```
 
@@ -249,7 +307,73 @@ Open this URL from a browser:
 http://192.168.1.154/
 ```
 
-Do **not** use `/space-science/` in this deployment. The contents were copied directly into the document root, so the website is served from `/`. The browser may show **Not secure** because this lab uses HTTP rather than HTTPS.
+### Understand the browser URL and filesystem mapping
+
+The website is deployed correctly, but the browser URL must match the directory where the files were copied.
+
+#### Option A: Serve the website from the root URL — current deployment
+
+The files were copied directly into:
+
+```text
+/var/www/lawfirm.com/html/
+```
+
+Therefore, use:
+
+```text
+http://192.168.1.154/
+             ↓
+/var/www/lawfirm.com/html/index.html
+```
+
+If you open:
+
+```text
+http://192.168.1.154/space-science/
+```
+
+Nginx searches for:
+
+```text
+/var/www/lawfirm.com/html/space-science/
+```
+
+That directory does not exist in the current deployment, so Nginx returns `404 Not Found`.
+
+#### Option B: Serve the website from `/space-science/`
+
+If you specifically want this URL:
+
+```text
+http://192.168.1.154/space-science/
+```
+
+create the subdirectory and copy the website there:
+
+```bash
+ansible node1 -b -m file -a \
+"path=/var/www/lawfirm.com/html/space-science state=directory owner=root group=root mode=0755"
+
+ansible node1 -b -m copy -a \
+"src=/tmp/space-science-extracted/space-science/upload/ dest=/var/www/lawfirm.com/html/space-science/ remote_src=yes owner=root group=root mode=preserve"
+
+ansible node1 -b -m command -a \
+"restorecon -Rv /var/www/lawfirm.com/html/space-science"
+
+ansible node1 -m uri -a \
+"url=http://localhost/space-science/ status_code=200"
+```
+
+The mapping is then:
+
+```text
+http://192.168.1.154/space-science/
+                      ↓
+/var/www/lawfirm.com/html/space-science/index.html
+```
+
+Choose one deployment layout and use its matching URL. For the current lab, Option A is simpler. The browser may show **Not secure** because the lab uses HTTP instead of HTTPS.
 
 Additional checks:
 
@@ -265,15 +389,57 @@ ansible node1 -m uri -a "url=http://localhost status_code=200"
 
 First verify that every node uses `/var/www/lawfirm.com/html`. If it does, run:
 
+### Step 1: Install Nginx and unzip
+
 ```bash
 ansible three_tier_app -b -m dnf -a "name=nginx,unzip state=present"
+```
+
+### Step 2: Start and enable Nginx
+
+```bash
 ansible three_tier_app -b -m service -a "name=nginx state=started enabled=yes"
+```
+
+### Step 3: Allow HTTP through firewalld
+
+```bash
 ansible three_tier_app -b -m firewalld -a "service=http permanent=yes immediate=yes state=enabled"
+```
+
+### Step 4: Download the archive
+
+```bash
 ansible three_tier_app -m get_url -a "url=https://freewebsitetemplates.com/download/space-science/ dest=/tmp/space-science.zip mode=0644"
+```
+
+### Step 5: Create the extraction directory
+
+```bash
 ansible three_tier_app -b -m file -a "path=/tmp/space-science-extracted state=directory mode=0755"
+```
+
+### Step 6: Extract the archive
+
+```bash
 ansible three_tier_app -b -m unarchive -a "src=/tmp/space-science.zip dest=/tmp/space-science-extracted remote_src=yes creates=/tmp/space-science-extracted/space-science/upload/index.html"
+```
+
+### Step 7: Copy the website to the active document root
+
+```bash
 ansible three_tier_app -b -m copy -a "src=/tmp/space-science-extracted/space-science/upload/ dest=/var/www/lawfirm.com/html/ remote_src=yes owner=root group=root mode=preserve"
+```
+
+### Step 8: Restore SELinux contexts
+
+```bash
 ansible three_tier_app -b -m command -a "restorecon -Rv /var/www/lawfirm.com/html"
+```
+
+### Step 9: Verify HTTP status
+
+```bash
 ansible three_tier_app -m uri -a "url=http://localhost status_code=200"
 ```
 
@@ -343,43 +509,108 @@ ansible node1 -b -m command -a "nginx -t"
 
 ## 12. Complete Cleanup
 
-These commands fully reset the pilot host. They deliberately remove the custom website and Nginx configuration, so use them only when a complete reset is intended.
+Use the inventory group `three_tier_app`, not `all`. In this lab, `all` may also include the Ansible control node.
+
+### Option 1: Reset only the website lab — recommended
+
+This removes the deployed content and temporary files but keeps Nginx and the `lawfirm.com` configuration ready for the next practice run.
+
+#### Step 1: Remove the current website content
 
 ```bash
-# Stop and disable Nginx
-ansible all -b -m service -a "name=nginx state=stopped enabled=no"
-
-# Remove Nginx packages
-ansible all -b -m dnf -a "name=nginx,nginx-core,nginx-filesystem state=absent"
-
-# Optional: remove unzip if it was installed only for this lab
-ansible all -b -m dnf -a "name=unzip state=absent"
-
-# Remove the custom site and remaining Nginx configuration
-ansible all -b -m file -a "path=/var/www/lawfirm.com state=absent"
-ansible all -b -m file -a "path=/etc/nginx state=absent"
-
-# Remove temporary deployment files
-ansible all -b -m file -a "path=/tmp/space-science-extracted state=absent"
-ansible all -b -m file -a "path=/tmp/space-science.zip state=absent"
-
-# Remove HTTP from the firewall only if no other site needs port 80
-ansible all -b -m firewalld -a "service=http permanent=yes immediate=yes state=disabled"
+ansible three_tier_app -b -m file -a \
+"path=/var/www/lawfirm.com/html state=absent"
 ```
 
-Verify the cleanup:
+#### Step 2: Recreate an empty document root
 
 ```bash
-ansible all -m command -a "rpm -q nginx nginx-core nginx-filesystem"
-ansible all -m stat -a "path=/var/www/lawfirm.com"
-ansible all -m stat -a "path=/tmp/space-science.zip"
-ansible all -m stat -a "path=/tmp/space-science-extracted"
-ansible node1 -b -m shell -a "ss -tlnp | grep ':80 ' || true"
+ansible three_tier_app -b -m file -a \
+"path=/var/www/lawfirm.com/html state=directory owner=root group=root mode=0755"
 ```
 
-Expected results: packages are not installed, removed paths show `exists: false`, and Nginx is not listening on port 80.
+Recreating the directory allows the next deployment to copy files into it. Until a new `index.html` is deployed, the root URL may return `403`.
 
-Replace `node1` with `three_tier_app` only after confirming that no managed node hosts another required website.
+#### Step 3: Remove the extracted files
+
+```bash
+ansible three_tier_app -b -m file -a \
+"path=/tmp/space-science-extracted state=absent"
+```
+
+#### Step 4: Remove the downloaded archive
+
+```bash
+ansible three_tier_app -b -m file -a \
+"path=/tmp/space-science.zip state=absent"
+```
+
+#### Step 5: Verify the practice cleanup
+
+```bash
+ansible three_tier_app -m stat -a "path=/var/www/lawfirm.com/html/index.html"
+ansible three_tier_app -m stat -a "path=/tmp/space-science.zip"
+ansible three_tier_app -m stat -a "path=/tmp/space-science-extracted"
+```
+
+Each removed item should report `exists: false`.
+
+### Option 2: Full Nginx reset
+
+Use this only when no other website on the managed nodes needs Nginx or port 80.
+
+#### Step 1: Stop and disable Nginx
+
+```bash
+ansible three_tier_app -b -m service -a \
+"name=nginx state=stopped enabled=no"
+```
+
+#### Step 2: Remove Nginx packages
+
+```bash
+ansible three_tier_app -b -m dnf -a \
+"name=nginx,nginx-core,nginx-filesystem state=absent"
+```
+
+#### Step 3: Optionally remove unzip
+
+```bash
+ansible three_tier_app -b -m dnf -a "name=unzip state=absent"
+```
+
+Remove it only if it was installed solely for this lab.
+
+#### Step 4: Disable HTTP in firewalld
+
+```bash
+ansible three_tier_app -b -m firewalld -a \
+"service=http permanent=yes immediate=yes state=disabled"
+```
+
+#### Step 5: Verify the full reset
+
+```bash
+ansible three_tier_app -m command -a \
+"rpm -q nginx nginx-core nginx-filesystem"
+
+ansible three_tier_app -b -m shell -a \
+"ss -tlnp | grep ':80 ' || true"
+```
+
+Packages should report `not installed`, and no Nginx process should listen on port 80.
+
+### Optional destructive configuration cleanup
+
+Do not remove `/etc/nginx` during normal practice cleanup. It contains the `lawfirm.com` configuration that defines `/var/www/lawfirm.com/html` as the active root.
+
+If you intentionally want to rebuild the complete Nginx configuration later, you may remove it:
+
+```bash
+ansible three_tier_app -b -m file -a "path=/etc/nginx state=absent"
+```
+
+After deleting `/etc/nginx`, reinstalling Nginx alone may restore the package defaults, but it will not recreate your custom `lawfirm.com` server block. You must recreate that configuration before using `/var/www/lawfirm.com/html` again.
 
 ---
 
