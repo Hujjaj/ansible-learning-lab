@@ -59,6 +59,8 @@ Move into the project directory:
 cd /home/ansibleadmin/automation
 ```
 
+> **Lab prerequisite:** the managed nodes must have the `lawfirm.com` Nginx server block configured to use `/var/www/lawfirm.com/html`. Confirm it with `nginx -T` before targeting all nodes. This playbook deploys website content; it does not create that server block.
+
 ---
 
 ## 3. Deployment Playbook
@@ -80,10 +82,12 @@ Add the following content:
   vars:
     website_url: "https://freewebsitetemplates.com/download/space-science/"
     archive_path: "/tmp/space-science.zip"
-    nginx_document_root: "/usr/share/nginx/html"
-    website_directory: "/usr/share/nginx/html/space-science"
-    website_index: "/usr/share/nginx/html/space-science/index.html"
-    website_uri: "http://localhost/space-science/"
+    extraction_directory: "/tmp/space-science-extracted"
+    extracted_website: "/tmp/space-science-extracted/space-science/upload"
+    extracted_index: "/tmp/space-science-extracted/space-science/upload/index.html"
+    nginx_document_root: "/var/www/lawfirm.com/html"
+    website_index: "/var/www/lawfirm.com/html/index.html"
+    website_uri: "http://localhost"
 
   tasks:
     - name: Install Nginx
@@ -109,40 +113,58 @@ Add the following content:
         immediate: true
         state: enabled
 
-    - name: Verify the default Nginx website
-      uri:
-        url: "http://localhost"
-        status_code: 200
-      changed_when: false
-
     - name: Download the website archive
       get_url:
         url: "{{ website_url }}"
         dest: "{{ archive_path }}"
         mode: "0644"
 
+    - name: Create the temporary extraction directory
+      file:
+        path: "{{ extraction_directory }}"
+        state: directory
+        mode: "0755"
+
     - name: Extract the website archive
       unarchive:
         src: "{{ archive_path }}"
-        dest: "{{ nginx_document_root }}"
+        dest: "{{ extraction_directory }}"
         remote_src: true
-        creates: "{{ website_index }}"
+        creates: "{{ extracted_index }}"
 
-    - name: Set website ownership and permissions
+    - name: Verify that the extracted website index exists
+      stat:
+        path: "{{ extracted_index }}"
+      register: extracted_index_status
+
+    - name: Stop when the archive layout is unexpected
+      fail:
+        msg: >-
+          The expected extracted file was not found at {{ extracted_index }}.
+          Inspect the archive with unzip -l {{ archive_path }}.
+      when: not extracted_index_status.stat.exists
+
+    - name: Ensure the active Nginx document root exists
       file:
-        path: "{{ website_directory }}"
+        path: "{{ nginx_document_root }}"
         state: directory
         owner: root
         group: root
-        mode: "u=rwX,g=rX,o=rX"
-        recurse: true
+        mode: "0755"
 
-    - name: Apply the web-content SELinux type
-      file:
-        path: "{{ website_directory }}"
-        state: directory
-        setype: httpd_sys_content_t
-        recurse: true
+    - name: Copy only the website files into the document root
+      copy:
+        src: "{{ extracted_website }}/"
+        dest: "{{ nginx_document_root }}/"
+        remote_src: true
+        owner: root
+        group: root
+        mode: preserve
+
+    - name: Restore SELinux contexts on the website files
+      command: "restorecon -Rv {{ nginx_document_root }}"
+      register: restorecon_result
+      changed_when: restorecon_result.stdout | length > 0
 
     - name: Verify that the website index exists
       stat:
@@ -153,7 +175,7 @@ Add the following content:
       fail:
         msg: >-
           The expected index file was not found at {{ website_index }}.
-          Inspect the ZIP structure and adjust website_directory and website_index.
+          Inspect the ZIP structure and adjust extracted_website or website_index.
       when: not website_index_status.stat.exists
 
     - name: Verify the custom website
@@ -220,26 +242,21 @@ Ensures Nginx is running now and after future reboots.
 
 Allows HTTP traffic while keeping `firewalld` enabled.
 
-### Default-page test
+### Why the pre-deployment HTTP test was removed
 
-The first `uri` task proves that Nginx works before deploying the custom site.
+The active `lawfirm.com` document root was initially empty, so an early `uri` task returned `403` and stopped the play before it could deploy the missing index file. The playbook now verifies HTTP only after deployment.
 
 ### Download task
 
 `get_url` downloads the ZIP archive directly to every managed node.
 
-### Extraction task
+### Extraction and copy tasks
 
-`remote_src: true` tells Ansible that the archive already exists on the managed node. `creates` improves repeatability by preventing extraction after the expected `index.html` exists.
+`remote_src: true` tells Ansible that the archive already exists on the managed node. The archive is extracted under `/tmp`, and `creates` prevents repeat extraction after the expected source index exists. The `copy` task transfers only the contents of `space-science/upload/` into the active document root.
 
-### Permission and SELinux tasks
+### Document root and SELinux tasks
 
-The `file` tasks ensure that:
-
-- Files belong to `root:root`.
-- Directories are traversable.
-- Website files are readable.
-- SELinux recognizes the directory as web content.
+The `file` task creates `/var/www/lawfirm.com/html` with safe permissions. The trailing slash in `{{ extracted_website }}/` copies the contents rather than an extra `upload` directory. `restorecon` assigns the policy-defined `httpd_sys_content_t` context after files are copied from `/tmp`.
 
 ### `stat`, `fail`, and `uri`
 
@@ -299,7 +316,7 @@ ansible-playbook playbooks/deploy-space-science.yml \
 Browser test:
 
 ```text
-http://192.168.1.154/space-science/
+http://192.168.1.154/
 ```
 
 Do not continue to all nodes until the pilot deployment succeeds.
@@ -316,6 +333,8 @@ ansible-playbook playbooks/deploy-space-science.yml
 
 Because `hosts: three_tier_app` is already defined, all three managed nodes are targeted.
 
+Run the full deployment only after confirming that the same `lawfirm.com` document root is configured on all three nodes.
+
 ---
 
 ## 8. Verification
@@ -331,22 +350,22 @@ ansible three_tier_app -m command -a \
 
 ```bash
 ansible three_tier_app -m stat -a \
-"path=/usr/share/nginx/html/space-science/index.html"
+"path=/var/www/lawfirm.com/html/index.html"
 ```
 
 ### Verify HTTP status
 
 ```bash
 ansible three_tier_app -m uri -a \
-"url=http://localhost/space-science/ status_code=200"
+"url=http://localhost status_code=200"
 ```
 
 ### Verify from a browser
 
 ```text
-http://192.168.1.154/space-science/
-http://192.168.1.185/space-science/
-http://192.168.1.190/space-science/
+http://192.168.1.154/
+http://192.168.1.185/
+http://192.168.1.190/
 ```
 
 ---
@@ -388,14 +407,15 @@ Add:
   become: true
 
   vars:
-    website_directory: "/usr/share/nginx/html/space-science"
+    website_root: "/var/www/lawfirm.com"
     archive_path: "/tmp/space-science.zip"
-    remove_nginx: false
+    extraction_directory: "/tmp/space-science-extracted"
+    full_reset: false
 
   tasks:
     - name: Remove the deployed website
       file:
-        path: "{{ website_directory }}"
+        path: "{{ website_root }}"
         state: absent
 
     - name: Remove the downloaded archive
@@ -403,31 +423,49 @@ Add:
         path: "{{ archive_path }}"
         state: absent
 
-    - name: Stop and disable Nginx when requested
+    - name: Remove the temporary extraction directory
+      file:
+        path: "{{ extraction_directory }}"
+        state: absent
+
+    - name: Stop and disable Nginx during a full reset
       service:
         name: nginx
         state: stopped
         enabled: false
-      when: remove_nginx | bool
+      when: full_reset | bool
 
-    - name: Remove Nginx when requested
+    - name: Remove Nginx packages during a full reset
       dnf:
-        name: nginx
+        name:
+          - nginx
+          - nginx-core
+          - nginx-filesystem
         state: absent
-      when: remove_nginx | bool
+      when: full_reset | bool
+
+    - name: Disable HTTP firewall access during a full reset
+      firewalld:
+        service: http
+        permanent: true
+        immediate: true
+        state: disabled
+      when: full_reset | bool
 ```
 
-### Remove only the website and ZIP file
+### Remove the website and temporary deployment files
 
 ```bash
 ansible-playbook playbooks/cleanup-space-science.yml
 ```
 
-### Also stop and uninstall Nginx
+This keeps the custom Nginx configuration so the lab can be repeated later.
+
+### Perform a full reset
 
 ```bash
 ansible-playbook playbooks/cleanup-space-science.yml \
--e "remove_nginx=true"
+-e "full_reset=true"
 ```
 
 ### Test cleanup on node1 first
@@ -453,9 +491,8 @@ ansible three_tier_app --limit node1 -m command -a \
 Update these playbook variables if necessary:
 
 ```yaml
-website_directory: "/actual/extracted/directory"
-website_index: "/actual/extracted/directory/index.html"
-website_uri: "http://localhost/actual-directory/"
+extracted_website: "/actual/extracted/directory"
+extracted_index: "/actual/extracted/directory/index.html"
 ```
 
 ### Website returns HTTP 403
@@ -464,10 +501,10 @@ Check permissions and SELinux:
 
 ```bash
 ansible three_tier_app --limit node1 -m command -a \
-"namei -l /usr/share/nginx/html/space-science/index.html"
+"namei -l /var/www/lawfirm.com/html/index.html"
 
 ansible three_tier_app --limit node1 -m command -a \
-"ls -lZ /usr/share/nginx/html/space-science/index.html"
+"ls -lZ /var/www/lawfirm.com/html/index.html"
 ```
 
 ### Website is unreachable from the browser
@@ -495,4 +532,3 @@ After mastering this version, improve the project by:
 5. Using a handler only when the Nginx configuration changes.
 6. Converting the playbook into an Ansible role.
 7. Storing the playbook in GitHub and launching it from AWX.
-

@@ -48,6 +48,8 @@ mkdir -p /home/ansibleadmin/automation/playbooks
 cd /home/ansibleadmin/automation
 ```
 
+> **Lab prerequisite:** managed nodes par `lawfirm.com` ka Nginx server block `/var/www/lawfirm.com/html` use karta ho. All nodes ko target karne se pehle `nginx -T` se confirm karein. Yeh playbook website content deploy karta hai; server block create nahi karta.
+
 ---
 
 ## 3. Deployment Playbook
@@ -69,10 +71,12 @@ Content:
   vars:
     website_url: "https://freewebsitetemplates.com/download/space-science/"
     archive_path: "/tmp/space-science.zip"
-    nginx_document_root: "/usr/share/nginx/html"
-    website_directory: "/usr/share/nginx/html/space-science"
-    website_index: "/usr/share/nginx/html/space-science/index.html"
-    website_uri: "http://localhost/space-science/"
+    extraction_directory: "/tmp/space-science-extracted"
+    extracted_website: "/tmp/space-science-extracted/space-science/upload"
+    extracted_index: "/tmp/space-science-extracted/space-science/upload/index.html"
+    nginx_document_root: "/var/www/lawfirm.com/html"
+    website_index: "/var/www/lawfirm.com/html/index.html"
+    website_uri: "http://localhost"
 
   tasks:
     - name: Install Nginx
@@ -98,40 +102,58 @@ Content:
         immediate: true
         state: enabled
 
-    - name: Verify the default Nginx website
-      uri:
-        url: "http://localhost"
-        status_code: 200
-      changed_when: false
-
     - name: Download the website archive
       get_url:
         url: "{{ website_url }}"
         dest: "{{ archive_path }}"
         mode: "0644"
 
+    - name: Create the temporary extraction directory
+      file:
+        path: "{{ extraction_directory }}"
+        state: directory
+        mode: "0755"
+
     - name: Extract the website archive
       unarchive:
         src: "{{ archive_path }}"
-        dest: "{{ nginx_document_root }}"
+        dest: "{{ extraction_directory }}"
         remote_src: true
-        creates: "{{ website_index }}"
+        creates: "{{ extracted_index }}"
 
-    - name: Set website ownership and permissions
+    - name: Verify that the extracted website index exists
+      stat:
+        path: "{{ extracted_index }}"
+      register: extracted_index_status
+
+    - name: Stop when the archive layout is unexpected
+      fail:
+        msg: >-
+          Expected extracted file {{ extracted_index }} par nahi mili.
+          Archive ko unzip -l {{ archive_path }} se inspect karein.
+      when: not extracted_index_status.stat.exists
+
+    - name: Ensure the active Nginx document root exists
       file:
-        path: "{{ website_directory }}"
+        path: "{{ nginx_document_root }}"
         state: directory
         owner: root
         group: root
-        mode: "u=rwX,g=rX,o=rX"
-        recurse: true
+        mode: "0755"
 
-    - name: Apply the web-content SELinux type
-      file:
-        path: "{{ website_directory }}"
-        state: directory
-        setype: httpd_sys_content_t
-        recurse: true
+    - name: Copy only the website files into the document root
+      copy:
+        src: "{{ extracted_website }}/"
+        dest: "{{ nginx_document_root }}/"
+        remote_src: true
+        owner: root
+        group: root
+        mode: preserve
+
+    - name: Restore SELinux contexts on the website files
+      command: "restorecon -Rv {{ nginx_document_root }}"
+      register: restorecon_result
+      changed_when: restorecon_result.stdout | length > 0
 
     - name: Verify that the website index exists
       stat:
@@ -190,15 +212,21 @@ URL aur paths ek jagah store hain, is liye future changes asaan hain.
 - `service` Nginx ko running aur boot par enabled rakhta hai.
 - `firewalld` firewall band kiye baghair HTTP allow karta hai.
 
-### `get_url` aur `unarchive`
+### `get_url`, `unarchive` aur `copy`
 
 - `get_url` har managed node par ZIP download karta hai.
 - `remote_src: true` batata hai ke ZIP managed node par hai.
-- `creates` repeated extraction ko rokta hai jab expected index file maujood ho.
+- Archive `/tmp/space-science-extracted` mein extract hoti hai.
+- `creates` repeated extraction ko rokta hai jab expected source index file maujood ho.
+- `copy` sirf `space-science/upload/` ke contents active document root mein copy karta hai.
 
-### Permissions aur SELinux
+### Document root aur SELinux
 
-`file` tasks ownership, readable permissions aur `httpd_sys_content_t` context ensure karte hain.
+`file` task `/var/www/lawfirm.com/html` create karta hai. Source ke aakhir ka trailing slash sirf directory ke contents copy karta hai. `restorecon` `/tmp` se copied files par policy ke mutabiq `httpd_sys_content_t` context restore karta hai.
+
+### Deployment se pehle `uri` test kyun nahi?
+
+Active document root pehle khaali tha, is liye early `uri` test `403` de kar play ko deployment se pehle rok deta. Ab HTTP verification website copy hone ke baad hoti hai.
 
 ### `stat`, `fail` aur `uri`
 
@@ -248,7 +276,7 @@ ansible-playbook playbooks/deploy-space-science.yml --limit node1
 Browser test:
 
 ```text
-http://192.168.1.154/space-science/
+http://192.168.1.154/
 ```
 
 Pilot successful ho to all nodes:
@@ -257,14 +285,16 @@ Pilot successful ho to all nodes:
 ansible-playbook playbooks/deploy-space-science.yml
 ```
 
+Full deployment se pehle confirm karein ke teenon nodes par wohi `lawfirm.com` document root configured hai.
+
 ---
 
 ## 7. Verification aur Idempotency
 
 ```bash
 ansible three_tier_app -m command -a "systemctl is-active nginx"
-ansible three_tier_app -m stat -a "path=/usr/share/nginx/html/space-science/index.html"
-ansible three_tier_app -m uri -a "url=http://localhost/space-science/ status_code=200"
+ansible three_tier_app -m stat -a "path=/var/www/lawfirm.com/html/index.html"
+ansible three_tier_app -m uri -a "url=http://localhost status_code=200"
 ```
 
 Playbook dobara chalayein:
@@ -302,14 +332,15 @@ Content:
   become: true
 
   vars:
-    website_directory: "/usr/share/nginx/html/space-science"
+    website_root: "/var/www/lawfirm.com"
     archive_path: "/tmp/space-science.zip"
-    remove_nginx: false
+    extraction_directory: "/tmp/space-science-extracted"
+    full_reset: false
 
   tasks:
     - name: Remove the deployed website
       file:
-        path: "{{ website_directory }}"
+        path: "{{ website_root }}"
         state: absent
 
     - name: Remove the downloaded archive
@@ -317,31 +348,49 @@ Content:
         path: "{{ archive_path }}"
         state: absent
 
-    - name: Stop and disable Nginx when requested
+    - name: Remove the temporary extraction directory
+      file:
+        path: "{{ extraction_directory }}"
+        state: absent
+
+    - name: Stop and disable Nginx during a full reset
       service:
         name: nginx
         state: stopped
         enabled: false
-      when: remove_nginx | bool
+      when: full_reset | bool
 
-    - name: Remove Nginx when requested
+    - name: Remove Nginx packages during a full reset
       dnf:
-        name: nginx
+        name:
+          - nginx
+          - nginx-core
+          - nginx-filesystem
         state: absent
-      when: remove_nginx | bool
+      when: full_reset | bool
+
+    - name: Disable HTTP firewall access during a full reset
+      firewalld:
+        service: http
+        permanent: true
+        immediate: true
+        state: disabled
+      when: full_reset | bool
 ```
 
-Sirf website aur ZIP remove karein:
+Website aur temporary deployment files remove karein:
 
 ```bash
 ansible-playbook playbooks/cleanup-space-science.yml
 ```
 
-Nginx bhi remove karein:
+Is se custom Nginx configuration rehti hai taa-ke lab dobara ki ja sake.
+
+Nginx packages aur firewall rule bhi reset karein:
 
 ```bash
 ansible-playbook playbooks/cleanup-space-science.yml \
--e "remove_nginx=true"
+-e "full_reset=true"
 ```
 
 Pehle sirf `node1` par cleanup test karein:
@@ -363,14 +412,14 @@ ansible three_tier_app --limit node1 -m command -a "unzip -l /tmp/space-science.
 Actual index path dhoondein:
 
 ```bash
-ansible three_tier_app --limit node1 -b -m shell -a "find /usr/share/nginx/html -name index.html -print"
+ansible three_tier_app --limit node1 -b -m shell -a "find /tmp/space-science-extracted -name index.html -print"
 ```
 
 HTTP 403 par permissions aur context check karein:
 
 ```bash
-ansible three_tier_app --limit node1 -m command -a "namei -l /usr/share/nginx/html/space-science/index.html"
-ansible three_tier_app --limit node1 -m command -a "ls -lZ /usr/share/nginx/html/space-science/index.html"
+ansible three_tier_app --limit node1 -m command -a "namei -l /var/www/lawfirm.com/html/index.html"
+ansible three_tier_app --limit node1 -m command -a "ls -lZ /var/www/lawfirm.com/html/index.html"
 ```
 
 Browser connect na kare to Nginx aur firewall check karein:
@@ -379,4 +428,3 @@ Browser connect na kare to Nginx aur firewall check karein:
 ansible three_tier_app --limit node1 -m command -a "systemctl is-active nginx"
 ansible three_tier_app --limit node1 -b -m command -a "firewall-cmd --list-services"
 ```
-
