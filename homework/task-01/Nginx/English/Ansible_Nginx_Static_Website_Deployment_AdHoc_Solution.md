@@ -151,6 +151,7 @@ Inspect the standard directory and the Nginx error log:
 ```bash
 ansible node1 -b -m command -a "ls -laZ /usr/share/nginx/html"
 ```
+[index.html explanation](md/Nginx_Index_HTML_Home_Page_Study_Notes.md)
 
 This directory contained Rocky Linux's standard Nginx files, but it was not the active root for the `lawfirm.com` server block.
 
@@ -189,7 +190,7 @@ ansible node1 -b -m copy -a \
 ansible node1 -b -m command -a "restorecon -Rv /var/www/lawfirm.com/html"
 ```
 
-[restorecon explanation](./Ansible_Restorecon_AdHoc_Command_Study_Notes.md)
+[restorecon explanation](md/Ansible_Restorecon_AdHoc_Command_Study_Notes.md)
 
 ### Step 6: Test the temporary page
 
@@ -197,6 +198,8 @@ ansible node1 -b -m command -a "restorecon -Rv /var/www/lawfirm.com/html"
 ansible node1 -m uri -a \
 "url=http://localhost status_code=200 return_content=yes"
 ```
+
+[URI Explanation](md/Ansible_URI_Status_Code_Study_Notes_English.md)
 
 Status `200` proves that Nginx, the active root, permissions, and SELinux access are working.
 

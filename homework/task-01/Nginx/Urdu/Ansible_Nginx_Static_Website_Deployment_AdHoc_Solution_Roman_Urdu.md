@@ -154,6 +154,8 @@ ansible node1 -m uri -a "url=http://localhost status_code=200"
 
 Is lab mein pehle test par `403 Forbidden` mila kyun ke active document root khaali tha aur us mein `index.html` nahi thi.
 
+[index.html explanation](md/Nginx_Index_HTML_Home_Page_Study_Notes_Roman_Urdu.md)
+
 ---
 
 ## 5. 403 Forbidden Diagnose Karein
@@ -208,6 +210,8 @@ ansible node1 -b -m command -a \
 ansible node1 -m uri -a \
 "url=http://localhost status_code=200 return_content=yes"
 ```
+
+[URI explanation](md/Ansible_URI_Status_Code_Study_Notes_Roman_Urdu.md)
 
 Status `200` prove karta hai ke Nginx, document root, permissions aur SELinux access sahi hain.
 
@@ -295,7 +299,7 @@ ansible node1 -b -m copy -a \
 ansible node1 -b -m command -a \
 "restorecon -Rv /var/www/lawfirm.com/html"
 ```
-[restorecon explanation](./Ansible_Restorecon_AdHoc_Command_Study_Notes_Roman_Urdu.md)
+[restorecon explanation](md/Ansible_Restorecon_AdHoc_Command_Study_Notes_Roman_Urdu.md)
 
 
 ### Step 5: Deployed index verify karein
