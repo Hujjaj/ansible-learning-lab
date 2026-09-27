@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nginx Concepts — 25 MCQs</title>
+  <style>
+    :root {
+      --bg: #07111f;
+      --panel: #0d1b2a;
+      --panel2: #12263a;
+      --line: #27445d;
+      --text: #e8f1f8;
+      --muted: #9fb3c8;
+      --cyan: #35d0ba;
+      --blue: #4ea8de;
+      --green: #35d07f;
+      --red: #ff6b6b;
+      --amber: #ffca58;
+      --shadow: 0 18px 55px rgba(0, 0, 0, .34);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(53, 208, 186, .13), transparent 34%),
+        radial-gradient(circle at 90% 10%, rgba(78, 168, 222, .13), transparent 32%),
+        var(--bg);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button, input { font: inherit; }
+    .app { width: min(1100px, calc(100% - 28px)); margin: 28px auto 54px; }
+    .hero {
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: linear-gradient(145deg, rgba(18,38,58,.96), rgba(8,20,33,.96));
+      box-shadow: var(--shadow);
+    }
+    .eyebrow { color: var(--cyan); font-weight: 800; letter-spacing: .13em; text-transform: uppercase; font-size: .76rem; }
+    h1 { margin: 8px 0 10px; font-size: clamp(1.8rem, 4vw, 3.1rem); line-height: 1.08; }
+    .subtitle { margin: 0; max-width: 800px; color: var(--muted); line-height: 1.65; }
+    .meta-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 22px; }
+    .meta { padding: 14px; border: 1px solid var(--line); background: rgba(4,15,26,.55); border-radius: 14px; }
+    .meta span { display: block; color: var(--muted); font-size: .78rem; }
+    .meta strong { display: block; margin-top: 5px; font-size: 1.05rem; }
+    .toolbar {
+      position: sticky; top: 10px; z-index: 20;
+      display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center;
+      margin: 18px 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: 16px;
+      background: rgba(8, 20, 33, .94); backdrop-filter: blur(14px); box-shadow: var(--shadow);
+    }
+    .progress-track { height: 10px; border-radius: 99px; background: #071421; overflow: hidden; border: 1px solid #1d3850; }
+    .progress-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--cyan), var(--blue)); transition: width .25s ease; }
+    .progress-label { margin-top: 6px; color: var(--muted); font-size: .8rem; }
+    .timer { min-width: 104px; text-align: center; font-weight: 900; font-variant-numeric: tabular-nums; color: var(--amber); }
+    .timer.danger { color: var(--red); animation: pulse 1s infinite; }
+    @keyframes pulse { 50% { opacity: .55; } }
+    .question-shell { display: grid; grid-template-columns: 1fr 280px; gap: 18px; align-items: start; }
+    .card, .navigator, .result-panel {
+      border: 1px solid var(--line); border-radius: 20px; background: rgba(13, 27, 42, .96); box-shadow: var(--shadow);
+    }
+    .card { padding: clamp(20px, 4vw, 34px); min-height: 450px; }
+    .q-top { display: flex; justify-content: space-between; gap: 14px; align-items: center; }
+    .badge { display: inline-flex; padding: 6px 10px; border-radius: 99px; color: var(--cyan); background: rgba(53,208,186,.1); border: 1px solid rgba(53,208,186,.3); font-size: .78rem; font-weight: 800; }
+    .q-count { color: var(--muted); font-size: .9rem; }
+    .question { font-size: clamp(1.18rem, 2.4vw, 1.55rem); line-height: 1.45; margin: 22px 0; }
+    .options { display: grid; gap: 12px; }
+    .option {
+      display: flex; gap: 12px; align-items: flex-start; cursor: pointer; padding: 15px;
+      border: 1px solid var(--line); border-radius: 14px; background: #0a1826; transition: .18s ease;
+    }
+    .option:hover { border-color: var(--blue); transform: translateY(-1px); }
+    .option.selected { border-color: var(--cyan); background: rgba(53,208,186,.1); }
+    .option input { margin-top: 4px; accent-color: var(--cyan); }
+    .letter { width: 27px; height: 27px; flex: 0 0 27px; display: grid; place-items: center; border-radius: 8px; background: #172d42; font-weight: 900; }
+    .actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-top: 25px; }
+    .action-group { display: flex; flex-wrap: wrap; gap: 10px; }
+    .btn {
+      border: 1px solid var(--line); border-radius: 12px; padding: 11px 16px; cursor: pointer;
+      color: var(--text); background: #142a3e; font-weight: 800; transition: .18s ease;
+    }
+    .btn:hover { transform: translateY(-1px); border-color: var(--blue); }
+    .btn:disabled { cursor: not-allowed; opacity: .4; transform: none; }
+    .btn.primary { border-color: transparent; color: #031613; background: linear-gradient(135deg, var(--cyan), #73e3c7); }
+    .btn.warn { border-color: rgba(255,202,88,.45); color: var(--amber); }
+    .navigator { padding: 17px; position: sticky; top: 100px; }
+    .navigator h2 { margin: 0 0 12px; font-size: 1rem; }
+    .q-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    .q-dot { aspect-ratio: 1; border-radius: 9px; border: 1px solid var(--line); color: var(--muted); background: #091827; cursor: pointer; font-weight: 800; }
+    .q-dot.answered { color: #031613; background: var(--cyan); border-color: var(--cyan); }
+    .q-dot.current { outline: 2px solid var(--amber); outline-offset: 2px; }
+    .nav-note { color: var(--muted); font-size: .78rem; line-height: 1.5; margin: 14px 0 0; }
+    .result-panel { display: none; padding: clamp(22px, 4vw, 38px); }
+    .result-panel.show { display: block; }
+    .result-head { display: grid; grid-template-columns: 170px 1fr; gap: 24px; align-items: center; }
+    .score-ring { width: 160px; height: 160px; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(var(--cyan) 0deg, #173149 0deg); position: relative; }
+    .score-ring::before { content: ""; position: absolute; inset: 13px; border-radius: 50%; background: var(--panel); }
+    .score-ring strong { position: relative; font-size: 2rem; }
+    .result-head h2 { margin: 0 0 8px; font-size: 2rem; }
+    .result-head p { color: var(--muted); line-height: 1.6; margin: 0; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 24px 0; }
+    .stat { padding: 15px; border: 1px solid var(--line); border-radius: 14px; background: #0a1826; text-align: center; }
+    .stat strong { display: block; font-size: 1.5rem; }
+    .stat span { color: var(--muted); font-size: .8rem; }
+    .breakdown { overflow-x: auto; margin: 20px 0; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 11px; border-bottom: 1px solid var(--line); }
+    th { color: var(--cyan); font-size: .82rem; }
+    .review { display: grid; gap: 14px; margin-top: 22px; }
+    .review-card { padding: 18px; border: 1px solid var(--line); border-left: 5px solid var(--green); border-radius: 14px; background: #091827; }
+    .review-card.wrong { border-left-color: var(--red); }
+    .review-card h3 { margin: 0 0 10px; font-size: 1rem; line-height: 1.5; }
+    .review-card p { margin: 6px 0; color: var(--muted); line-height: 1.55; }
+    .review-card .correct-text { color: var(--green); }
+    .review-card .wrong-text { color: var(--red); }
+    .hidden { display: none !important; }
+    footer { text-align: center; color: var(--muted); margin-top: 24px; font-size: .82rem; }
+    @media (max-width: 780px) {
+      .meta-grid { grid-template-columns: repeat(2, 1fr); }
+      .toolbar { grid-template-columns: 1fr auto; }
+      .toolbar .progress-wrap { grid-column: 1 / -1; grid-row: 2; }
+      .question-shell { grid-template-columns: 1fr; }
+      .navigator { position: static; order: -1; }
+      .q-grid { grid-template-columns: repeat(10, 1fr); }
+      .result-head { grid-template-columns: 1fr; text-align: center; justify-items: center; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 500px) {
+      .app { width: min(100% - 16px, 1100px); margin-top: 10px; }
+      .hero, .card, .result-panel { border-radius: 16px; }
+      .meta-grid { grid-template-columns: 1fr 1fr; }
+      .q-grid { grid-template-columns: repeat(5, 1fr); }
+      .actions, .action-group { width: 100%; }
+      .actions .btn, .action-group .btn { flex: 1; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="hero">
+      <div class="eyebrow">Linux • Web Server • Hands-on Revision</div>
+      <h1>Nginx Concepts — 25 MCQs</h1>
+      <p class="subtitle">A practical assessment covering Nginx fundamentals, installation, services, firewall, document roots, virtual hosts, HTTP status codes, Linux permissions, SELinux and troubleshooting.</p>
+      <div class="meta-grid">
+        <div class="meta"><span>Questions</span><strong>25</strong></div>
+        <div class="meta"><span>Time Limit</span><strong>25 minutes</strong></div>
+        <div class="meta"><span>Passing Score</span><strong>80%</strong></div>
+        <div class="meta"><span>Mode</span><strong>Shuffle every attempt</strong></div>
+      </div>
+    </section>
+
+    <section id="quizArea">
+      <div class="toolbar">
+        <div class="progress-wrap">
+          <div class="progress-track"><div id="progressFill" class="progress-fill"></div></div>
+          <div id="progressLabel" class="progress-label">Answered 0 of 25</div>
+        </div>
+        <div id="timer" class="timer" aria-live="polite">25:00</div>
+        <button id="submitTop" class="btn primary" type="button">Submit Quiz</button>
+      </div>
+
+      <div class="question-shell">
+        <article class="card">
+          <div class="q-top">
+            <span id="category" class="badge"></span>
+            <span id="questionCount" class="q-count"></span>
+          </div>
+          <h2 id="questionText" class="question"></h2>
+          <div id="options" class="options"></div>
+          <div class="actions">
+            <div class="action-group">
+              <button id="prevBtn" class="btn" type="button">← Previous</button>
+              <button id="nextBtn" class="btn" type="button">Next →</button>
+            </div>
+            <button id="submitBtn" class="btn primary" type="button">Submit Quiz</button>
+          </div>
+        </article>
+
+        <aside class="navigator">
+          <h2>Question Navigator</h2>
+          <div id="questionGrid" class="q-grid"></div>
+          <p class="nav-note">Cyan means answered. The amber outline shows your current question.</p>
+        </aside>
+      </div>
+    </section>
+
+    <section id="resultPanel" class="result-panel">
+      <div class="result-head">
+        <div id="scoreRing" class="score-ring"><strong id="scorePercent">0%</strong></div>
+        <div>
+          <div class="eyebrow">Quiz Result</div>
+          <h2 id="resultTitle">Result</h2>
+          <p id="resultMessage"></p>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><strong id="correctStat">0</strong><span>Correct</span></div>
+        <div class="stat"><strong id="wrongStat">0</strong><span>Incorrect</span></div>
+        <div class="stat"><strong id="unansweredStat">0</strong><span>Unanswered</span></div>
+        <div class="stat"><strong id="timeStat">00:00</strong><span>Time Used</span></div>
+      </div>
+      <div class="breakdown">
+        <h2>Topic Breakdown</h2>
+        <table>
+          <thead><tr><th>Topic</th><th>Correct</th><th>Total</th><th>Percentage</th></tr></thead>
+          <tbody id="breakdownBody"></tbody>
+        </table>
+      </div>
+      <div class="actions">
+        <div class="action-group">
+          <button id="allReviewBtn" class="btn" type="button">Show All Answers</button>
+          <button id="wrongReviewBtn" class="btn warn" type="button">Show Incorrect Only</button>
+        </div>
+        <button id="retryBtn" class="btn primary" type="button">Reattempt &amp; Shuffle</button>
+      </div>
+      <div id="review" class="review"></div>
+    </section>
+
+    <footer>Standalone offline quiz • Nginx Learning Lab • Created for hands-on study</footer>
+  </main>
+
+  <script>
+    "use strict";
+
+    const questions = [
+      {
+        id: 1, category: "Fundamentals",
+        question: "What is the primary purpose of Nginx?",
+        choices: [
+          { text: "To serve web content and proxy network requests", correct: true },
+          { text: "To manage Linux user passwords", correct: false },
+          { text: "To partition storage devices", correct: false },
+          { text: "To compile the Linux kernel", correct: false }
+        ],
+        explanation: "Nginx is commonly used as a web server, reverse proxy, load balancer and HTTP cache."
+      },
+      {
+        id: 2, category: "Fundamentals",
+        question: "Which TCP port is normally used for unencrypted HTTP traffic?",
+        choices: [
+          { text: "22", correct: false }, { text: "53", correct: false },
+          { text: "80", correct: true }, { text: "443", correct: false }
+        ],
+        explanation: "HTTP normally uses TCP port 80, while HTTPS normally uses TCP port 443."
+      },
+      {
+        id: 3, category: "Fundamentals",
+        question: "What is a document root in Nginx?",
+        choices: [
+          { text: "The directory from which website files are served", correct: true },
+          { text: "The root user's home directory", correct: false },
+          { text: "The directory containing SSH keys", correct: false },
+          { text: "The system boot partition", correct: false }
+        ],
+        explanation: "The root directive identifies the filesystem directory containing content for a website."
+      },
+      {
+        id: 4, category: "Fundamentals",
+        question: "Why is index.html commonly called a website's homepage?",
+        choices: [
+          { text: "Nginx normally serves it when a directory URL is requested", correct: true },
+          { text: "It always contains the Nginx configuration", correct: false },
+          { text: "Linux requires every directory to have it", correct: false },
+          { text: "It starts the Nginx service", correct: false }
+        ],
+        explanation: "The index directive tells Nginx which file to serve when the request points to a directory."
+      },
+      {
+        id: 5, category: "Fundamentals",
+        question: "Which Nginx directive defines the hostname handled by a server block?",
+        choices: [
+          { text: "server_name", correct: true }, { text: "hostname", correct: false },
+          { text: "document_name", correct: false }, { text: "site_host", correct: false }
+        ],
+        explanation: "The server_name directive is matched against the HTTP Host header."
+      },
+      {
+        id: 6, category: "Service and Firewall",
+        question: "What does systemctl enable --now nginx do?",
+        choices: [
+          { text: "Starts Nginx now and enables it at boot", correct: true },
+          { text: "Only validates the Nginx configuration", correct: false },
+          { text: "Removes Nginx and its configuration", correct: false },
+          { text: "Opens TCP port 80 in firewalld", correct: false }
+        ],
+        explanation: "--now starts the service immediately, while enable configures automatic startup at boot."
+      },
+      {
+        id: 7, category: "Service and Firewall",
+        question: "Which command should be run before reloading Nginx configuration?",
+        choices: [
+          { text: "nginx -t", correct: true }, { text: "nginx -d", correct: false },
+          { text: "httpd -S", correct: false }, { text: "firewall-cmd --reload", correct: false }
+        ],
+        explanation: "nginx -t checks the configuration syntax and referenced files before a reload."
+      },
+      {
+        id: 8, category: "Service and Firewall",
+        question: "Which command permanently allows HTTP through firewalld?",
+        choices: [
+          { text: "firewall-cmd --permanent --add-service=http", correct: true },
+          { text: "firewall-cmd --remove-service=http", correct: false },
+          { text: "systemctl enable http", correct: false },
+          { text: "nginx --open-port 80", correct: false }
+        ],
+        explanation: "The permanent rule must normally be followed by firewall-cmd --reload to become active."
+      },
+      {
+        id: 9, category: "Service and Firewall",
+        question: "What is the main difference between reloading and restarting Nginx?",
+        choices: [
+          { text: "Reload applies configuration with less interruption; restart stops and starts the service", correct: true },
+          { text: "Reload uninstalls Nginx; restart installs it", correct: false },
+          { text: "Restart validates syntax but reload does not", correct: false },
+          { text: "There is never any difference", correct: false }
+        ],
+        explanation: "A reload asks Nginx to apply updated configuration gracefully, while a restart cycles the service."
+      },
+      {
+        id: 10, category: "Service and Firewall",
+        question: "Which command shows the process listening on TCP port 80?",
+        choices: [
+          { text: "ss -tlnp | grep ':80'", correct: true },
+          { text: "df -h | grep 80", correct: false },
+          { text: "free -h", correct: false },
+          { text: "lsblk -f", correct: false }
+        ],
+        explanation: "ss -tlnp displays listening TCP sockets and their associated processes."
+      },
+      {
+        id: 11, category: "Files and URLs",
+        question: "The document root is /var/www/site/html. Which file normally serves a request for /shop/?",
+        choices: [
+          { text: "/var/www/site/html/shop/index.html", correct: true },
+          { text: "/shop/var/www/site/html", correct: false },
+          { text: "/etc/nginx/shop/index.html", correct: false },
+          { text: "/home/shop/index.conf", correct: false }
+        ],
+        explanation: "The URL path is appended beneath the document root, and the directory index is then selected."
+      },
+      {
+        id: 12, category: "Files and URLs",
+        question: "What does a trailing slash in cp -a source/. destination/ help copy?",
+        choices: [
+          { text: "The contents of the source directory into the destination", correct: true },
+          { text: "Only hidden files", correct: false },
+          { text: "Only index.html", correct: false },
+          { text: "The parent of the source directory", correct: false }
+        ],
+        explanation: "Using source/. copies the directory contents, including hidden entries, into the destination."
+      },
+      {
+        id: 13, category: "Files and URLs",
+        question: "Why must CSS, JavaScript, images and fonts be copied with index.html?",
+        choices: [
+          { text: "The HTML may reference those assets to render the complete site", correct: true },
+          { text: "Nginx refuses to serve HTML alone", correct: false },
+          { text: "They are required to start firewalld", correct: false },
+          { text: "They create Linux user accounts", correct: false }
+        ],
+        explanation: "Without referenced assets, the HTML may load but the website can appear broken or incomplete."
+      },
+      {
+        id: 14, category: "Files and URLs",
+        question: "What does curl -I http://localhost/ request?",
+        choices: [
+          { text: "HTTP response headers", correct: true },
+          { text: "Only the website images", correct: false },
+          { text: "The Nginx configuration file", correct: false },
+          { text: "A list of Linux processes", correct: false }
+        ],
+        explanation: "The -I option performs a HEAD request and displays response headers such as the status code."
+      },
+      {
+        id: 15, category: "Files and URLs",
+        question: "Which HTTP status code means the request succeeded?",
+        choices: [
+          { text: "200", correct: true }, { text: "301", correct: false },
+          { text: "403", correct: false }, { text: "404", correct: false }
+        ],
+        explanation: "HTTP 200 OK means the server successfully handled the request."
+      },
+      {
+        id: 16, category: "Virtual Hosts",
+        question: "How can two Nginx websites share the same IP address and port 80?",
+        choices: [
+          { text: "Use separate server blocks with different server_name values", correct: true },
+          { text: "Give both sites the same document root and no hostname", correct: false },
+          { text: "Run two firewalls on port 80", correct: false },
+          { text: "Create two root user accounts", correct: false }
+        ],
+        explanation: "Name-based virtual hosting selects a server block from the requested hostname."
+      },
+      {
+        id: 17, category: "Virtual Hosts",
+        question: "Which HTTP request field helps Nginx select a named virtual host?",
+        choices: [
+          { text: "Host header", correct: true }, { text: "Content-Length header", correct: false },
+          { text: "User-Agent only", correct: false }, { text: "File owner", correct: false }
+        ],
+        explanation: "Nginx compares the Host header with configured server_name values."
+      },
+      {
+        id: 18, category: "Virtual Hosts",
+        question: "What is the purpose of the root directive inside a server block?",
+        choices: [
+          { text: "It specifies the document root for that virtual host", correct: true },
+          { text: "It forces every request to run as root", correct: false },
+          { text: "It changes the Linux root password", correct: false },
+          { text: "It opens the firewall", correct: false }
+        ],
+        explanation: "The root directive maps request paths to files beneath a chosen filesystem directory."
+      },
+      {
+        id: 19, category: "Virtual Hosts",
+        question: "In try_files $uri $uri/ =404, what happens if no requested file or directory exists?",
+        choices: [
+          { text: "Nginx returns HTTP 404", correct: true },
+          { text: "Nginx returns HTTP 200 with an empty page", correct: false },
+          { text: "The server automatically reboots", correct: false },
+          { text: "Nginx disables SELinux", correct: false }
+        ],
+        explanation: "The final =404 parameter explicitly returns Not Found when earlier candidates do not exist."
+      },
+      {
+        id: 20, category: "Virtual Hosts",
+        question: "Why might a Windows hosts-file entry be needed in a LAN lab?",
+        choices: [
+          { text: "To map a practice hostname to the server IP when DNS is unavailable", correct: true },
+          { text: "To install Nginx remotely", correct: false },
+          { text: "To assign SELinux labels", correct: false },
+          { text: "To create the website files", correct: false }
+        ],
+        explanation: "A hosts-file entry provides local name resolution without requiring a DNS server."
+      },
+      {
+        id: 21, category: "Security and Troubleshooting",
+        question: "Which SELinux type normally allows a web server to read static website content?",
+        choices: [
+          { text: "httpd_sys_content_t", correct: true },
+          { text: "ssh_home_t", correct: false },
+          { text: "shadow_t", correct: false },
+          { text: "boot_t", correct: false }
+        ],
+        explanation: "Static web content is commonly labeled httpd_sys_content_t on SELinux-enabled systems."
+      },
+      {
+        id: 22, category: "Security and Troubleshooting",
+        question: "Why use semanage fcontext before restorecon on a custom document root?",
+        choices: [
+          { text: "To define a persistent expected SELinux context for the path", correct: true },
+          { text: "To disable SELinux permanently", correct: false },
+          { text: "To change the Nginx TCP port", correct: false },
+          { text: "To create a DNS record", correct: false }
+        ],
+        explanation: "semanage stores the policy mapping; restorecon then applies the expected label to files."
+      },
+      {
+        id: 23, category: "Security and Troubleshooting",
+        question: "A site returns 403 Forbidden and the log says 'directory index is forbidden.' What is a likely cause?",
+        choices: [
+          { text: "The configured document root does not contain a readable index file", correct: true },
+          { text: "The browser received HTTP 200", correct: false },
+          { text: "The hostname resolved correctly", correct: false },
+          { text: "The ZIP file was inspected with unzip -l", correct: false }
+        ],
+        explanation: "A missing or unreadable index file commonly causes a directory-index forbidden response."
+      },
+      {
+        id: 24, category: "Security and Troubleshooting",
+        question: "Which file should be checked first for detailed Nginx request failures?",
+        choices: [
+          { text: "/var/log/nginx/error.log", correct: true },
+          { text: "/etc/passwd", correct: false },
+          { text: "/boot/grub2/grub.cfg", correct: false },
+          { text: "/etc/fstab", correct: false }
+        ],
+        explanation: "The Nginx error log commonly records missing files, permission problems and configuration-related failures."
+      },
+      {
+        id: 25, category: "Security and Troubleshooting",
+        question: "Why is nginx -t && systemctl reload nginx safer than running reload alone?",
+        choices: [
+          { text: "Reload runs only when the configuration test succeeds", correct: true },
+          { text: "It automatically disables the firewall", correct: false },
+          { text: "It removes every old server block", correct: false },
+          { text: "It guarantees every website returns HTTP 200", correct: false }
+        ],
+        explanation: "The shell && operator executes the second command only if the first command exits successfully."
+      }
+    ];
+
+    const QUIZ_SECONDS = 25 * 60;
+    const PASS_PERCENT = 80;
+    let quiz = [];
+    let selections = {};
+    let currentIndex = 0;
+    let remaining = QUIZ_SECONDS;
+    let timerHandle = null;
+    let submitted = false;
+    let lastResults = [];
+
+    const $ = id => document.getElementById(id);
+    const shuffle = input => {
+      const a = [...input];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    };
+    const escapeHtml = value => String(value).replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
+
+    function startQuiz() {
+      clearInterval(timerHandle);
+      quiz = shuffle(questions).map(q => ({ ...q, choices: shuffle(q.choices.map(c => ({...c}))) }));
+      selections = {};
+      currentIndex = 0;
+      remaining = QUIZ_SECONDS;
+      submitted = false;
+      lastResults = [];
+      $("quizArea").classList.remove("hidden");
+      $("resultPanel").classList.remove("show");
+      $("review").innerHTML = "";
+      buildNavigator();
+      renderQuestion();
+      updateProgress();
+      updateTimer();
+      timerHandle = setInterval(() => {
+        remaining--;
+        updateTimer();
+        if (remaining <= 0) submitQuiz(true);
+      }, 1000);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function buildNavigator() {
+      $("questionGrid").innerHTML = quiz.map((_, i) =>
+        `<button class="q-dot" type="button" data-index="${i}" aria-label="Go to question ${i + 1}">${i + 1}</button>`
+      ).join("");
+      $("questionGrid").querySelectorAll("button").forEach(btn => {
+        btn.addEventListener("click", () => {
+          currentIndex = Number(btn.dataset.index);
+          renderQuestion();
+        });
+      });
+    }
+
+    function renderQuestion() {
+      const q = quiz[currentIndex];
+      $("category").textContent = q.category;
+      $("questionCount").textContent = `Question ${currentIndex + 1} of ${quiz.length}`;
+      $("questionText").textContent = q.question;
+      $("options").innerHTML = q.choices.map((choice, i) => {
+        const checked = selections[q.id] === i;
+        return `<label class="option ${checked ? "selected" : ""}">
+          <input type="radio" name="answer" value="${i}" ${checked ? "checked" : ""}>
+          <span class="letter">${String.fromCharCode(65 + i)}</span>
+          <span>${escapeHtml(choice.text)}</span>
+        </label>`;
+      }).join("");
+      $("options").querySelectorAll("input").forEach(input => {
+        input.addEventListener("change", event => {
+          selections[q.id] = Number(event.target.value);
+          renderQuestion();
+          updateProgress();
+        });
+      });
+      $("prevBtn").disabled = currentIndex === 0;
+      $("nextBtn").disabled = currentIndex === quiz.length - 1;
+      updateNavigator();
+    }
+
+    function updateNavigator() {
+      $("questionGrid").querySelectorAll(".q-dot").forEach((dot, i) => {
+        dot.classList.toggle("current", i === currentIndex);
+        dot.classList.toggle("answered", selections[quiz[i].id] !== undefined);
+      });
+    }
+
+    function updateProgress() {
+      const answered = Object.keys(selections).length;
+      const pct = (answered / quiz.length) * 100;
+      $("progressFill").style.width = `${pct}%`;
+      $("progressLabel").textContent = `Answered ${answered} of ${quiz.length}`;
+      updateNavigator();
+    }
+
+    function updateTimer() {
+      const minutes = Math.floor(Math.max(remaining, 0) / 60);
+      const seconds = Math.max(remaining, 0) % 60;
+      $("timer").textContent = `${String(minutes).padStart(2,"0")}:${String(seconds).padStart(2,"0")}`;
+      $("timer").classList.toggle("danger", remaining <= 120);
+    }
+
+    function submitQuiz(autoSubmit = false) {
+      if (submitted) return;
+      const unanswered = quiz.length - Object.keys(selections).length;
+      if (!autoSubmit && unanswered > 0) {
+        const proceed = confirm(`You have ${unanswered} unanswered question${unanswered === 1 ? "" : "s"}. Submit anyway?`);
+        if (!proceed) return;
+      }
+      submitted = true;
+      clearInterval(timerHandle);
+      lastResults = quiz.map(q => {
+        const selectedIndex = selections[q.id];
+        const correctIndex = q.choices.findIndex(c => c.correct);
+        return { q, selectedIndex, correctIndex, isCorrect: selectedIndex === correctIndex };
+      });
+      showResults(autoSubmit);
+    }
+
+    function showResults(autoSubmit) {
+      const correct = lastResults.filter(r => r.isCorrect).length;
+      const unanswered = lastResults.filter(r => r.selectedIndex === undefined).length;
+      const wrong = quiz.length - correct - unanswered;
+      const percentage = Math.round((correct / quiz.length) * 100);
+      const passed = percentage >= PASS_PERCENT;
+      const used = QUIZ_SECONDS - Math.max(remaining, 0);
+      $("quizArea").classList.add("hidden");
+      $("resultPanel").classList.add("show");
+      $("scorePercent").textContent = `${percentage}%`;
+      $("scoreRing").style.background = `conic-gradient(${passed ? "var(--green)" : "var(--amber)"} ${percentage * 3.6}deg, #173149 0deg)`;
+      $("resultTitle").textContent = passed ? "Passed — Well Done!" : "Keep Practicing";
+      $("resultMessage").textContent = `${autoSubmit ? "Time expired and the quiz was submitted automatically. " : ""}You scored ${correct} out of ${quiz.length}. ${passed ? "You met the 80% passing requirement." : "Review the explanations and try again."}`;
+      $("correctStat").textContent = correct;
+      $("wrongStat").textContent = wrong;
+      $("unansweredStat").textContent = unanswered;
+      $("timeStat").textContent = `${String(Math.floor(used / 60)).padStart(2,"0")}:${String(used % 60).padStart(2,"0")}`;
+      renderBreakdown();
+      renderReview(false);
+      window.scrollTo({ top: $("resultPanel").offsetTop - 12, behavior: "smooth" });
+    }
+
+    function renderBreakdown() {
+      const categories = [...new Set(questions.map(q => q.category))];
+      $("breakdownBody").innerHTML = categories.map(category => {
+        const rows = lastResults.filter(r => r.q.category === category);
+        const correct = rows.filter(r => r.isCorrect).length;
+        const pct = Math.round((correct / rows.length) * 100);
+        return `<tr><td>${escapeHtml(category)}</td><td>${correct}</td><td>${rows.length}</td><td>${pct}%</td></tr>`;
+      }).join("");
+    }
+
+    function renderReview(incorrectOnly) {
+      const rows = incorrectOnly ? lastResults.filter(r => !r.isCorrect) : lastResults;
+      if (rows.length === 0) {
+        $("review").innerHTML = `<div class="review-card"><h3>Excellent — no incorrect answers.</h3><p>You answered every question correctly.</p></div>`;
+        return;
+      }
+      $("review").innerHTML = rows.map((r, i) => {
+        const selected = r.selectedIndex === undefined ? "Not answered" : r.q.choices[r.selectedIndex].text;
+        const correct = r.q.choices[r.correctIndex].text;
+        return `<article class="review-card ${r.isCorrect ? "" : "wrong"}">
+          <h3>${i + 1}. ${escapeHtml(r.q.question)}</h3>
+          <p class="${r.isCorrect ? "correct-text" : "wrong-text"}"><strong>Your answer:</strong> ${escapeHtml(selected)}</p>
+          <p class="correct-text"><strong>Correct answer:</strong> ${escapeHtml(correct)}</p>
+          <p><strong>Explanation:</strong> ${escapeHtml(r.q.explanation)}</p>
+        </article>`;
+      }).join("");
+    }
+
+    $("prevBtn").addEventListener("click", () => { if (currentIndex > 0) { currentIndex--; renderQuestion(); } });
+    $("nextBtn").addEventListener("click", () => { if (currentIndex < quiz.length - 1) { currentIndex++; renderQuestion(); } });
+    $("submitBtn").addEventListener("click", () => submitQuiz(false));
+    $("submitTop").addEventListener("click", () => submitQuiz(false));
+    $("retryBtn").addEventListener("click", startQuiz);
+    $("allReviewBtn").addEventListener("click", () => renderReview(false));
+    $("wrongReviewBtn").addEventListener("click", () => renderReview(true));
+
+    startQuiz();
+  </script>
+</body>
+</html>
