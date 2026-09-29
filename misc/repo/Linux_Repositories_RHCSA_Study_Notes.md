@@ -315,6 +315,5 @@ Exam workflow: **correct machine → correct URLs → create `.repo` file → in
 - [DNF command reference](https://dnf.readthedocs.io/en/latest/command_ref.html)
 - [Fedora: EPEL FAQ](https://fedoraproject.org/wiki/EPEL/FAQ)
 - [Fedora: epel-release package](https://packages.fedoraproject.org/pkgs/epel-release/epel-release/)
-- [User's YouTube reference](https://www.youtube.com/live/HRKvoIqJvbc?si=am7_lUEKMiw77OqJ) — video contents could not be retrieved; these notes do not claim to summarize it.
 
 [Back to topic index](#topic-index)
