@@ -381,6 +381,5 @@ Exam mein tartib:
 - [DNF command reference](https://dnf.readthedocs.io/en/latest/command_ref.html)
 - [Fedora: EPEL FAQ](https://fedoraproject.org/wiki/EPEL/FAQ)
 - [Fedora: epel-release package](https://packages.fedoraproject.org/pkgs/epel-release/epel-release/)
-- [Aapka diya hua YouTube link](https://www.youtube.com/live/HRKvoIqJvbc?si=am7_lUEKMiw77OqJ) — video ka content retrieve nahi ho saka; yeh notes video ka verified khulasa nahi hain.
 
 [Topic index par wapas jayein](#topic-index)
