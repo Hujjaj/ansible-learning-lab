@@ -1,6 +1,8 @@
 # Linux Repositories aur RHCSA Repository Configuration
 
-Shuru se samajhne ke liye study notes — RHEL 9 / Rocky Linux 9
+Shuru se samajhne ke liye combined study notes — RHEL 9 / Rocky Linux 9
+
+Attached `RHCSA_Project_02_software-repositories(1).md` ke useful topics, corrected commands aur real-job scenario shamil hain.
 
 ## Topic index
 
@@ -19,7 +21,15 @@ Shuru se samajhne ke liye study notes — RHEL 9 / Rocky Linux 9
 13. [Troubleshooting](#troubleshooting)
 14. [Jaldi revision](#jaldi-revision)
 15. [Practice sawalat aur jawab](#practice-sawalat-aur-jawab)
-16. [References](#references)
+16. [Mirrorlist aur baseurl ka farq](#mirrorlist-aur-baseurl-ka-farq)
+17. [Rocky repo settings ki tafseel](#rocky-repo-settings-ki-tafseel)
+18. [Package kis repo mein hai](#package-kis-repo-mein-hai)
+19. [Eight repo ka doosra lab example](#eight-repo-ka-doosra-lab-example)
+20. [DNF cache commands](#dnf-cache-commands)
+21. [Network checks ki tartib](#network-checks-ki-tartib)
+22. [Real job scenario aur rollback](#real-job-scenario-aur-rollback)
+23. [Completion checklist aur review](#completion-checklist-aur-review)
+24. [References](#references)
 
 ## Package kya hai?
 
@@ -375,11 +385,282 @@ Exam mein tartib:
 6. Nahi. Dono aik hi location ki taraf ishara karte hain.
 7. Repository base URL ke andar `repodata/repomd.xml`.
 
+## Mirrorlist aur baseurl ka farq
+
+Attached project mein sab se useful baat yeh hai ke **Rocky ke public mirrors aur lab ke direct server mein farq** samjhaya gaya hai.
+
+| Setting | DNF kya karta hai? |
+|---|---|
+| `baseurl=` | Seedha diye hue repository address se metadata aur packages leta hai |
+| `mirrorlist=` | Service se mirror servers ke addresses leta hai, phir mirror se packages leta hai |
+| `#baseurl=` | Line comment hai; active configuration nahi |
+
+Mirrorlist service aik address directory ki tarah hai; mirror servers asal package stores hain. `baseurl` internet, internal network ya local `file://` path ka bhi ho sakta hai.
+
+## Rocky repo settings ki tafseel
+
+Apni VM par asal configuration dekhein:
+
+```bash
+ls -l /etc/yum.repos.d/
+cat /etc/yum.repos.d/rocky.repo
+```
+
+Filename aapki installation mein mukhtalif ho sakta hai. Attached file se aik chhoti misaal:
+
+```ini
+[baseos]
+name=Rocky Linux $releasever - BaseOS
+mirrorlist=https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=BaseOS-$releasever$rltype
+#baseurl=http://dl.rockylinux.org/$contentdir/$releasever/BaseOS/$basearch/os/
+gpgcheck=1
+enabled=1
+countme=1
+metadata_expire=6h
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9
+```
+
+Yeh samjhane ke liye hai; working `rocky.repo` ko is example se overwrite na karein.
+
+| Setting | Roman Urdu mein matlab |
+|---|---|
+| `$releasever` | DNF distribution ki release value bhar deta hai, jaise `9` |
+| `$basearch` | System architecture, jaise `x86_64` ya `aarch64` |
+| `$rltype` | Rocky ki repo naming mein istemal hone wali variable |
+| `$contentdir` | Rocky ke content path ki variable |
+| `countme=1` | Mirror requests ke zariye systems ki tadaad ka andaza lagane mein madad |
+| `metadata_expire=6h` | Chhay ghantay baad cached metadata expired samjha jata hai aur zaroorat par refresh hota hai |
+| `gpgkey=file:///...` | Isi machine par trusted public signing key ki location |
+
+**`metadata_expire=6h` ka matlab installed software chhay ghantay baad expire hona nahi.** DNF sirf ghantay guzarne par background mein lazmi refresh nahi karta; metadata istemal karte waqt freshness dekhta hai.
+
+Variables ko DNF substitute karta hai. Inke liye khud fixed values likhna aam tor par zaroori nahi.
+
+## Package kis repo mein hai
+
+```bash
+dnf info bash
+dnf info python3
+dnf info --available httpd
+```
+
+Output mein `Repository` field dekhein. Installed package ke liye `@System` aa sakta hai; `From repo` bhi dikh sakta hai. Available package ka source dekhne ke liye `--available` useful hai.
+
+```bash
+dnf repolist
+dnf repolist --all
+```
+
+Pehli command enabled repositories dikhati hai. Doosri disabled entries bhi dikhati hai. Output aapki VM ke installed repositories ke mutabiq hoga; attached sample ko apna expected exact output na samjhein.
+
+## Eight repo ka doosra lab example
+
+Attached file mein pehle sawal se **alag URLs** diye gaye hain:
+
+```text
+http://repo.eight.example.com/BaseOS
+http://repo.eight.example.com/AppStream
+```
+
+Yeh pehle identical `content.example.com` URLs ka confirmed correction nahi; doosra practice example hai. Har lab mein usi sawal ke URLs istemal karein.
+
+### File banayein
+
+```bash
+sudo vi /etc/yum.repos.d/eight.repo
+```
+
+```ini
+[eight-baseos]
+name=Eight BaseOS
+baseurl=http://repo.eight.example.com/BaseOS
+enabled=1
+gpgcheck=0
+
+[eight-appstream]
+name=Eight AppStream
+baseurl=http://repo.eight.example.com/AppStream
+enabled=1
+gpgcheck=0
+```
+
+Signature checking ke liye wahi lab assumption lagu hai jo pehle samjhayi gayi hai. Sawal mein key ka zikr na hona akela saboot nahi ke `gpgcheck=0` lazmi hai.
+
+**Repo IDs tamam `.repo` files mein unique rakhein.** Agar Rocky mein `[baseos]` pehle mojood hai, nayi file mein `[eight-baseos]` jaisi distinct ID istemal karein. Sirf `name=` badalne se ID nahi badalti.
+
+### Metadata aur configuration verify karein
+
+```bash
+curl -fL --max-time 10 http://repo.eight.example.com/BaseOS/repodata/repomd.xml
+curl -fL --max-time 10 http://repo.eight.example.com/AppStream/repodata/repomd.xml
+sudo dnf --disablerepo='*' --enablerepo=eight-baseos --enablerepo=eight-appstream makecache --refresh
+dnf --disablerepo='*' --enablerepo=eight-baseos --enablerepo=eight-appstream repolist
+```
+
+`curl` metadata entry point test karta hai; DNF ka successful metadata refresh zyada mukammal check hai. Lab hostname ghar ke network par reachable hona zaroori nahi.
+
+### Agar Apache install karna task ka hissa ho
+
+```bash
+dnf --disablerepo='*' --enablerepo=eight-baseos --enablerepo=eight-appstream info --available httpd
+sudo dnf --disablerepo='*' --enablerepo=eight-baseos --enablerepo=eight-appstream install httpd
+rpm -q httpd
+```
+
+`rpm -q httpd` local RPM database se check karta hai ke package installed hai. Yeh Apache service ke running hone ya installation ke source ka akela saboot nahi.
+
+**Attached file ki correction:** kuch commands mein `Eightbaseos,Eightappstream` likha tha, jabke configured IDs `eight-baseos` aur `eight-appstream` hain. Upar tamam commands mein IDs configuration ke sath match karti hain. ID ka spelling aur case exact rakhein.
+
+## DNF cache commands
+
+Cache ko store ki saved catalog copy samjhein.
+
+| Command | Kaam |
+|---|---|
+| `sudo dnf clean all` | Cached metadata aur cached packages waghera saaf karta hai; installed software remove nahi karta |
+| `sudo dnf makecache` | Enabled repositories ka metadata cache tayyar karta hai; fresh cache reuse ho sakta hai |
+| `sudo dnf makecache --refresh` | Metadata expire karke dobara freshness check karta hai |
+| `sudo dnf install httpd` | Package aur dependencies install karta hai |
+
+Har installation se pehle `clean all` chalana zaroori nahi. Naye repo ki verification ke liye targeted `makecache --refresh` aam tor par kaafi hai. Unrelated repo ki failure se bachne ke liye selected IDs use karein.
+
+## Network checks ki tartib
+
+Repository tak access ke liye interface, IP address, route, name resolution aur HTTP service sab ka kaam karna zaroori ho sakta hai.
+
+### Interface aur IP
+
+```bash
+ip -br link
+ip -br address
+nmcli device status
+nmcli connection show
+```
+
+`nmcli connection show` connection profiles dikhata hai; akela cable ki sehat prove nahi karta. VM ka NIC virtual hota hai; virtual link aur hypervisor/network setup bhi check hota hai.
+
+Agar `ethtool` available ho:
+
+```bash
+sudo ethtool INTERFACE_NAME
+```
+
+`INTERFACE_NAME` ko apne interface, jaise `enX0`, se replace karein. `Link detected: yes` link ki indication hai, poori connectivity ka saboot nahi.
+
+### Routing aur gateway
+
+```bash
+ip route
+```
+
+Default gateway doosre networks tak traffic bhejne ke liye istemal hota hai. Isi local subnet ka repo aam tor par direct on-link route se reachable hota hai; uske liye default gateway lazmi nahi.
+
+### Name resolution
+
+```bash
+cat /etc/resolv.conf
+getent hosts repo.eight.example.com
+```
+
+`/etc/resolv.conf` configured DNS resolver information dikhata hai; DNS server zaroori nahi ke home router hi ho.
+
+`getent` ka matlab “get entries” hai. `getent hosts` system ke host lookup rules istemal karta hai, jo `/etc/nsswitch.conf` ke mutabiq `/etc/hosts`, DNS aur doosre sources ko shamil kar sakte hain. IP milna system name resolution ki kamyabi hai; yeh DNS se hi jawab milne ka lazmi saboot nahi.
+
+Agar `dig` aur `nslookup` pehle se available hon:
+
+```bash
+dig repo.eight.example.com
+nslookup repo.eight.example.com
+```
+
+Yeh DNS queries karte hain. Rocky 9 mein in tools ke liye `bind-utils` package istemal hota hai:
+
+```bash
+sudo dnf install bind-utils
+```
+
+Agar repository hi fail ho rahi ho, to naya tool install karna bhi fail ho sakta hai. Pehle available commands se diagnosis karein.
+
+### Ping aur HTTP
+
+```bash
+ping -c 3 repo.eight.example.com
+curl -fL --max-time 10 http://repo.eight.example.com/BaseOS/repodata/repomd.xml
+```
+
+Ping ICMP use karta hai; TCP/UDP ports use nahi karta. Successful ping HTTP service ko prove nahi karta; failed ping bhi HTTP failure ko lazmi prove nahi karta kyun ke ICMP blocked ho sakta hai.
+
+`curl -I` sirf HTTP HEAD response leta hai. Directory ka 200 response package metadata ko prove nahi karta; kuch servers HEAD ko reject bhi karte hain. Is liye metadata file ka GET aur DNF refresh behtar checks hain.
+
+## Real job scenario aur rollback
+
+Attached file ka business scenario: company NEXUS sirf approved repositories se software install/update karna chahti hai. Doosri team repository server tayyar kar chuki hai; aap clients ko us server ka address configure karte hain aur patching validate karte hain.
+
+Suggested tartib:
+
+1. Aik test VM par current state record karein.
+2. Repo configuration ki backup banayein.
+3. Approved URLs aur trusted keys configure karein.
+4. Metadata aur requested package test karein.
+5. Pilot group par Ansible se change karein.
+6. Validation ke baad wider rollout ke liye playbook/Automation Controller use karein.
+7. Evidence aur rollback steps record karein.
+
+### Home directory mein backup
+
+```bash
+backup_dir="$HOME/repo-backups/$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$backup_dir"
+sudo cp -a /etc/yum.repos.d "$backup_dir/"
+dnf repolist --all > "$backup_dir/repolist-before.txt"
+rpm -qa | sort > "$backup_dir/packages-before.txt"
+```
+
+Yeh repo configuration aur package list ki backup/evidence hai. **Installed packages, data ya poori VM ki backup nahi.** Package patching rollback ke liye munasib snapshot/backup aur tested recovery plan alag se chahiye.
+
+### Sirf nayi eight.repo configuration ko wapas lena
+
+```bash
+sudo mv /etc/yum.repos.d/eight.repo "$backup_dir/eight.repo.disabled"
+dnf repolist
+```
+
+Yeh same shell mein saved `backup_dir` ki misaal hai. Naye session mein asal backup path use karein. File repo directory se hatne par uski entries load nahi hoti. Is se installed/updated packages downgrade ya uninstall nahi hotay. Agar purani file modify ki thi, usi file ki backup restore karein; poori directory ko andha-dhund overwrite na karein.
+
+Repo files disk par save hoti hain aur reboot ke baad bhi rehti hain. Sirf persistence check karne ke liye har dafa reboot zaroori nahi; task ya maintenance plan maange to reboot ke baad verify karein.
+
+## Completion checklist aur review
+
+- [ ] Sahi VM confirm ki.
+- [ ] URL aur repo IDs check kiye.
+- [ ] Zaroorat ke mutabiq configuration backup banayi.
+- [ ] `.repo` file save aur inspect ki.
+- [ ] Targeted metadata refresh successful hua.
+- [ ] Manga gaya package install aur verify kiya, agar task mein tha.
+- [ ] Existing security settings bila wajah change nahi ki.
+- [ ] Evidence aur configuration rollback samajh liya.
+- [ ] Patching rollback ko repo rollback se alag samjha.
+
+Review sawalat:
+
+1. Business masla kya tha? **Approved sources se controlled software distribution aur patching.**
+2. Kaunsi command enabled configuration dikhati hai? **`dnf repolist`.**
+3. Kaunsi command metadata access verify karti hai? **Targeted `dnf makecache --refresh`.**
+4. Persistence kis wajah se hai? **Configuration disk par `.repo` file mein save hai.**
+5. Repo rollback aur patch rollback mein farq? **Repo rollback source settings wapas karta hai; patch rollback software/data state restore karta hai.**
+
+Attached Markdown mein images ke relative links thay, lekin image files attach nahi hui theen. Is combined file mein unki jagah text explanations aur tables hain taa-ke broken images na dikhain.
+
 ## References
+
+- User ka attached project: `RHCSA_Project_02_software-repositories(1).md`.
+- [DNF configuration reference](https://dnf.readthedocs.io/en/latest/conf_ref.html)
+- [Red Hat: RHEL 9 repositories](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/considerations_in_adopting_rhel_9/ref_repositories_considerations-in-adopting-rhel-9)
 
 - [Red Hat: Managing custom software repositories, RHEL 9](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/managing_software_with_the_dnf_tool/assembly_managing-custom-software-repositories_managing-software-with-the-dnf-tool)
 - [DNF command reference](https://dnf.readthedocs.io/en/latest/command_ref.html)
 - [Fedora: EPEL FAQ](https://fedoraproject.org/wiki/EPEL/FAQ)
 - [Fedora: epel-release package](https://packages.fedoraproject.org/pkgs/epel-release/epel-release/)
+- [Aapka diya hua YouTube link](https://www.youtube.com/live/HRKvoIqJvbc?si=am7_lUEKMiw77OqJ) — video ka content retrieve nahi ho saka; yeh notes video ka verified khulasa nahi hain.
 
 [Topic index par wapas jayein](#topic-index)

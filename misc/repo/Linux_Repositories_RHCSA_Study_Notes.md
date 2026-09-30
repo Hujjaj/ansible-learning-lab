@@ -1,6 +1,8 @@
 # Linux Repositories and RHCSA Repository Configuration
 
-Beginner study notes • RHEL 9 / Rocky Linux 9
+Combined beginner study notes • RHEL 9 / Rocky Linux 9
+
+Includes useful material from the attached `RHCSA_Project_02_software-repositories(1).md`, corrected commands, and a workplace scenario.
 
 ## Topic index
 
@@ -19,7 +21,15 @@ Beginner study notes • RHEL 9 / Rocky Linux 9
 13. [Troubleshooting](#troubleshooting)
 14. [Quick revision](#quick-revision)
 15. [Practice questions](#practice-questions)
-16. [References](#references)
+16. [Mirrorlist versus baseurl](#mirrorlist-versus-baseurl)
+17. [Rocky repository settings in detail](#rocky-repository-settings-in-detail)
+18. [Finding a package repository](#finding-a-package-repository)
+19. [Eight repository lab example](#eight-repository-lab-example)
+20. [DNF cache commands](#dnf-cache-commands)
+21. [Network checks in order](#network-checks-in-order)
+22. [Real job scenario and rollback](#real-job-scenario-and-rollback)
+23. [Completion checklist and review](#completion-checklist-and-review)
+24. [References](#references)
 
 ## What is a package?
 
@@ -309,11 +319,282 @@ Exam workflow: **correct machine → correct URLs → create `.repo` file → in
 6. No. They point to the same location.
 7. `repodata/repomd.xml`, relative to the repository base URL.
 
+## Mirrorlist versus baseurl
+
+The attached project explains the difference between Rocky's public mirrors and a direct lab repository server.
+
+| Setting | What DNF does |
+|---|---|
+| `baseurl=` | Retrieves metadata and packages directly from the supplied repository address |
+| `mirrorlist=` | Requests mirror addresses from a service, then retrieves packages from a mirror |
+| `#baseurl=` | Treats the line as a comment; it is inactive |
+
+The mirrorlist service acts as an address directory. Mirror servers hold the package content. A `baseurl` can point to an internet server, an internal server, or a local `file://` location.
+
+## Rocky repository settings in detail
+
+Inspect the actual configuration on your VM:
+
+```bash
+ls -l /etc/yum.repos.d/
+cat /etc/yum.repos.d/rocky.repo
+```
+
+The filename may differ on your installation. A shortened example from the attached project:
+
+```ini
+[baseos]
+name=Rocky Linux $releasever - BaseOS
+mirrorlist=https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=BaseOS-$releasever$rltype
+#baseurl=http://dl.rockylinux.org/$contentdir/$releasever/BaseOS/$basearch/os/
+gpgcheck=1
+enabled=1
+countme=1
+metadata_expire=6h
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9
+```
+
+This is an explanatory example. Do not overwrite a working `rocky.repo` with it.
+
+| Setting | Meaning |
+|---|---|
+| `$releasever` | DNF substitutes the distribution release value, such as `9` |
+| `$basearch` | System architecture, such as `x86_64` or `aarch64` |
+| `$rltype` | Rocky variable used in repository naming |
+| `$contentdir` | Rocky variable used in its content path |
+| `countme=1` | Helps estimate the number of systems using mirrors through repository requests |
+| `metadata_expire=6h` | Cached metadata expires after six hours and is refreshed when needed |
+| `gpgkey=file:///...` | Location of the trusted public signing key on this machine |
+
+**`metadata_expire=6h` does not mean installed software expires after six hours.** DNF does not necessarily run a background refresh when that time passes; it checks freshness when metadata is needed.
+
+DNF substitutes the variables. You normally do not need to replace them manually with fixed values.
+
+## Finding a package repository
+
+```bash
+dnf info bash
+dnf info python3
+dnf info --available httpd
+```
+
+Inspect the `Repository` field. An installed package may show `@System` and may also have a `From repo` field. Use `--available` to inspect available package sources.
+
+```bash
+dnf repolist
+dnf repolist --all
+```
+
+The first command lists enabled repositories; the second includes disabled entries. Output depends on your VM's configuration. The attached sample is not an exact expected output for every VM.
+
+## Eight repository lab example
+
+The attached file provides a second practice example with separate URLs:
+
+```text
+http://repo.eight.example.com/BaseOS
+http://repo.eight.example.com/AppStream
+```
+
+These are different from the earlier `content.example.com` URLs. They are not a confirmed correction to that first question. Use the URLs supplied for each particular lab.
+
+### Create the configuration
+
+```bash
+sudo vi /etc/yum.repos.d/eight.repo
+```
+
+```ini
+[eight-baseos]
+name=Eight BaseOS
+baseurl=http://repo.eight.example.com/BaseOS
+enabled=1
+gpgcheck=0
+
+[eight-appstream]
+name=Eight AppStream
+baseurl=http://repo.eight.example.com/AppStream
+enabled=1
+gpgcheck=0
+```
+
+The signature-checking assumption explained earlier also applies here. A question omitting a key does not by itself establish that `gpgcheck=0` is required.
+
+**Keep repository IDs unique across all `.repo` files.** If Rocky already uses `[baseos]`, use a distinct ID such as `[eight-baseos]` in the new file. Changing `name=` alone does not change the repository ID.
+
+### Verify metadata and configuration
+
+```bash
+curl -fL --max-time 10 http://repo.eight.example.com/BaseOS/repodata/repomd.xml
+curl -fL --max-time 10 http://repo.eight.example.com/AppStream/repodata/repomd.xml
+sudo dnf --disablerepo='*' --enablerepo=eight-baseos --enablerepo=eight-appstream makecache --refresh
+dnf --disablerepo='*' --enablerepo=eight-baseos --enablerepo=eight-appstream repolist
+```
+
+The `curl` commands test metadata entry points. A successful DNF metadata refresh provides a more complete check. A lab hostname may be unavailable from your home network.
+
+### Install Apache if the task requires it
+
+```bash
+dnf --disablerepo='*' --enablerepo=eight-baseos --enablerepo=eight-appstream info --available httpd
+sudo dnf --disablerepo='*' --enablerepo=eight-baseos --enablerepo=eight-appstream install httpd
+rpm -q httpd
+```
+
+`rpm -q httpd` checks the local RPM database for installation. It does not by itself prove that Apache is running or identify the installation source.
+
+**Correction to the attached project:** some commands used `Eightbaseos,Eightappstream`, while the configured IDs were `eight-baseos` and `eight-appstream`. All commands above use IDs matching the configuration. Match spelling and case exactly.
+
+## DNF cache commands
+
+Think of the cache as a saved copy of a store catalog.
+
+| Command | Purpose |
+|---|---|
+| `sudo dnf clean all` | Removes cached metadata and cached packages; does not remove installed software |
+| `sudo dnf makecache` | Prepares metadata caches for enabled repositories; fresh caches may be reused |
+| `sudo dnf makecache --refresh` | Expires metadata and checks freshness again |
+| `sudo dnf install httpd` | Installs the package and its dependencies |
+
+You do not need `clean all` before every installation. A targeted `makecache --refresh` is usually sufficient to validate a newly configured repository. Select the intended repository IDs to avoid unrelated repository failures.
+
+## Network checks in order
+
+Access to a repository may depend on a working interface, IP address, route, name resolution, and HTTP service.
+
+### Interface and IP address
+
+```bash
+ip -br link
+ip -br address
+nmcli device status
+nmcli connection show
+```
+
+`nmcli connection show` lists connection profiles; it does not by itself prove a physical cable is healthy. A VM uses a virtual NIC, so virtual links and hypervisor networking also matter.
+
+If `ethtool` is available:
+
+```bash
+sudo ethtool INTERFACE_NAME
+```
+
+Replace `INTERFACE_NAME` with your actual interface, such as `enX0`. `Link detected: yes` indicates a link, not complete connectivity.
+
+### Routing and gateway
+
+```bash
+ip route
+```
+
+A default gateway sends traffic to other networks. A repository on the same local subnet normally uses an on-link route and does not require the default gateway for that connection.
+
+### Name resolution
+
+```bash
+cat /etc/resolv.conf
+getent hosts repo.eight.example.com
+```
+
+`/etc/resolv.conf` shows DNS resolver configuration. The DNS server is not necessarily your home router.
+
+`getent` means “get entries.” With `hosts`, it uses the system's host lookup rules in `/etc/nsswitch.conf`, which may include `/etc/hosts`, DNS, and other sources. Receiving an IP address proves successful system name resolution, but not necessarily that DNS supplied the answer.
+
+If `dig` and `nslookup` are already available:
+
+```bash
+dig repo.eight.example.com
+nslookup repo.eight.example.com
+```
+
+These tools query DNS. On Rocky Linux 9 they are provided by `bind-utils`:
+
+```bash
+sudo dnf install bind-utils
+```
+
+When repositories are already failing, installing a troubleshooting tool may also fail. Start with tools available on the system.
+
+### Ping and HTTP
+
+```bash
+ping -c 3 repo.eight.example.com
+curl -fL --max-time 10 http://repo.eight.example.com/BaseOS/repodata/repomd.xml
+```
+
+Ping uses ICMP rather than TCP or UDP ports. Successful ping does not prove HTTP works. Failed ping does not necessarily prove HTTP is unavailable because ICMP may be blocked.
+
+`curl -I` requests HTTP headers using HEAD. A successful directory response does not prove repository metadata is available, and some servers reject HEAD requests. Fetching the metadata file with GET and refreshing it through DNF are more useful repository checks.
+
+## Real job scenario and rollback
+
+The attached project's business scenario describes NEXUS, a company requiring software installation and updates from approved repositories. Another team has prepared the repository server. Your job is to configure clients to use it and validate patching.
+
+Suggested sequence:
+
+1. Record the current state on a test VM.
+2. Back up repository configuration.
+3. Configure approved URLs and trusted keys.
+4. Test metadata and the requested package.
+5. Apply the change to a pilot group with Ansible.
+6. After validation, use a playbook and Automation Controller for a wider rollout.
+7. Record evidence and rollback steps.
+
+### Back up configuration in your home directory
+
+```bash
+backup_dir="$HOME/repo-backups/$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$backup_dir"
+sudo cp -a /etc/yum.repos.d "$backup_dir/"
+dnf repolist --all > "$backup_dir/repolist-before.txt"
+rpm -qa | sort > "$backup_dir/packages-before.txt"
+```
+
+This backs up repository configuration and records package inventory. **It does not back up installed package contents, application data, or the entire VM.** Patching rollback requires a suitable snapshot/backup and a tested recovery plan separately.
+
+### Roll back only the new eight.repo configuration
+
+```bash
+sudo mv /etc/yum.repos.d/eight.repo "$backup_dir/eight.repo.disabled"
+dnf repolist
+```
+
+This example assumes the same shell still has `backup_dir` set. In a new session, supply the actual backup path. Moving the file out of the repository directory prevents DNF from loading its entries. It does not downgrade or uninstall packages. If you modified an existing file, restore that particular file from its backup rather than blindly overwriting the entire directory.
+
+Repository files persist on disk across reboots. Rebooting is not required every time merely to establish that a file is saved; verify after reboot when the task or maintenance plan requires it.
+
+## Completion checklist and review
+
+- [ ] Confirmed the correct VM.
+- [ ] Checked URLs and repository IDs.
+- [ ] Backed up configuration when needed.
+- [ ] Saved and inspected the `.repo` file.
+- [ ] Successfully refreshed metadata for the intended repositories.
+- [ ] Installed and verified the requested package, if required.
+- [ ] Kept existing security settings unless a justified change was required.
+- [ ] Recorded evidence and understood configuration rollback.
+- [ ] Distinguished patching rollback from repository rollback.
+
+Review questions:
+
+1. What business problem was solved? **Controlled software distribution and patching from approved sources.**
+2. Which command lists enabled configuration? **`dnf repolist`.**
+3. Which command verifies metadata access? **Targeted `dnf makecache --refresh`.**
+4. Why is the configuration persistent? **It is saved in a `.repo` file on disk.**
+5. How do repository rollback and patch rollback differ? **Repository rollback restores source settings; patch rollback restores software/data state.**
+
+The attached Markdown references image files using relative paths, but those images were not attached. This combined document uses text explanations and tables in their place to avoid broken images.
+
 ## References
+
+- User-provided project: `RHCSA_Project_02_software-repositories(1).md`.
+- [DNF configuration reference](https://dnf.readthedocs.io/en/latest/conf_ref.html)
+- [Red Hat: RHEL 9 repositories](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/considerations_in_adopting_rhel_9/ref_repositories_considerations-in-adopting-rhel-9)
 
 - [Red Hat: Managing custom software repositories, RHEL 9](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/managing_software_with_the_dnf_tool/assembly_managing-custom-software-repositories_managing-software-with-the-dnf-tool)
 - [DNF command reference](https://dnf.readthedocs.io/en/latest/command_ref.html)
 - [Fedora: EPEL FAQ](https://fedoraproject.org/wiki/EPEL/FAQ)
 - [Fedora: epel-release package](https://packages.fedoraproject.org/pkgs/epel-release/epel-release/)
+- [User's YouTube reference](https://www.youtube.com/live/HRKvoIqJvbc?si=am7_lUEKMiw77OqJ) — video contents could not be retrieved; these notes do not claim to summarize it.
 
 [Back to topic index](#topic-index)
