@@ -303,7 +303,7 @@ The `grep` example uses POSIX character classes, while the Ansible `regexp` uses
 Although `lineinfile` validates before saving, perform an explicit demonstration:
 
 ```bash
-ansible three_tier_app -b -m command -a \
+ansible three_tier_app -b -m shell -a \
 "/usr/sbin/sshd -t"
 ```
 
@@ -324,10 +324,131 @@ ansible three_tier_app -b -m shell -a \
 "/usr/sbin/sshd -T | grep '^banner '"
 ```
 
+
 Expected output:
 
 ```text
 banner /etc/ssh/banner.txt
+```
+
+### Understand the executable path and configuration path
+
+These two paths have different purposes:
+
+| Path | Purpose |
+|---|---|
+| `/usr/sbin/sshd` | The OpenSSH server executable that runs the SSH daemon |
+| `/etc/ssh/sshd_config` | The main OpenSSH server configuration file read by `sshd` |
+
+Running this command:
+
+```bash
+/usr/sbin/sshd -T
+```
+
+automatically reads the default server configuration file:
+
+```text
+/etc/ssh/sshd_config
+```
+
+It also processes configuration files referenced by `Include` directives, such as files under `/etc/ssh/sshd_config.d/`. The output represents the final effective SSH server configuration rather than simply displaying the text stored in one file.
+
+The executable is normally located at `/usr/sbin/sshd` on Rocky Linux. Using `/usr/bin/sshd` produces an error similar to:
+
+```text
+[Errno 2] No such file or directory: b'/usr/bin/sshd'
+```
+
+Confirm the executable path when necessary:
+
+```bash
+ansible node1 -m command -a \
+"ls -l /usr/sbin/sshd"
+```
+
+### Why `shell` is required for the pipe
+
+This does **not** work:
+
+```bash
+ansible node1 -b -m command -a \
+"/usr/sbin/sshd -T | grep '^banner '"
+```
+
+The `command` module does not start a shell, so it does not interpret `|`. Instead, it passes the pipe character to `sshd` as an ordinary argument. The result is:
+
+```text
+Extra argument |
+```
+
+Use `shell` when the remote command contains shell operators such as `|`, `>`, `>>`, `&&`, or `;`:
+
+```bash
+ansible node1 -b -m shell -a \
+"/usr/sbin/sshd -T | grep '^banner '"
+```
+
+### Alternative commands
+
+#### Alternative 1 — Explicitly specify `sshd_config`
+
+The `-f` option selects a configuration file explicitly:
+
+```bash
+ansible node1 -b -m shell -a \
+"/usr/sbin/sshd -T -f /etc/ssh/sshd_config | grep '^banner '"
+```
+
+This normally returns the same value because `/etc/ssh/sshd_config` is already the default file.
+
+#### Alternative 2 — Use `command` without a remote pipe
+
+The `command` module works when no shell feature is required:
+
+```bash
+ansible node1 -b -m command -a \
+"/usr/sbin/sshd -T -f /etc/ssh/sshd_config"
+```
+
+This prints the complete effective configuration instead of only the banner line.
+
+#### Alternative 3 — Filter Ansible output on the control node
+
+In this form, `sshd` runs through the remote `command` module, while the control node's shell processes the final pipe:
+
+```bash
+ansible node1 -b -m command -a \
+"/usr/sbin/sshd -T -f /etc/ssh/sshd_config" |
+grep '^banner '
+```
+
+The position of the pipe is important: it is outside the quoted module arguments.
+
+#### Alternative 4 — Perform syntax validation only
+
+Use lowercase `-t` when only syntax validation is required:
+
+```bash
+ansible node1 -b -m command -a \
+"/usr/sbin/sshd -t -f /etc/ssh/sshd_config"
+```
+
+No output with `rc=0` means the configuration syntax is valid.
+
+### `-t`, `-T`, and `-f` summary
+
+| Option | Meaning |
+|---|---|
+| `-t` | Validate configuration syntax and host-key sanity; normally silent when successful |
+| `-T` | Validate and print the complete effective server configuration |
+| `-f FILE` | Read the specified configuration file instead of relying on the default path |
+
+For this lab, the recommended banner verification command is:
+
+```bash
+ansible node1 -b -m shell -a \
+"/usr/sbin/sshd -T -f /etc/ssh/sshd_config | grep '^banner '"
 ```
 
 The ad-hoc `shell` module normally reports `CHANGED` when its command succeeds, even though this verification command does not modify the system.
@@ -403,7 +524,7 @@ ansible three_tier_app -m stat -a \
 ansible three_tier_app -b -m lineinfile -a \
 'path=/etc/ssh/sshd_config regexp="^\s*#?\s*Banner\s+.*$" line="Banner /etc/ssh/banner.txt" state=present backup=yes validate="/usr/sbin/sshd -t -f %s"'
 
-ansible three_tier_app -b -m command -a \
+ansible three_tier_app -b -m shell -a \
 "/usr/sbin/sshd -t"
 
 ansible three_tier_app -b -m shell -a \
