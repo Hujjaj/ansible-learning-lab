@@ -1,408 +1,365 @@
-# Linux Repositories and RHCSA Repository Configuration
+# RHCSA Software Repository Configuration — Complete Study Notes
 
-Combined beginner study notes • RHEL 9 / Rocky Linux 9
+<img src="Linux-Repositories.png" width="700">
 
-Includes useful material from the attached `RHCSA_Project_02_software-repositories(1).md`, corrected commands, and a workplace scenario.
 
-## Topic index
+These notes explain Linux software repositories from the beginning and then apply the concepts to an RHCSA-style repository configuration task on RHEL or Rocky Linux 9.
 
-1. [What is a package?](#what-is-a-package)
-2. [What is a repository?](#what-is-a-repository)
-3. [YUM and DNF](#yum-and-dnf)
-4. [Dependencies and metadata](#dependencies-and-metadata)
-5. [BaseOS and AppStream](#baseos-and-appstream)
-6. [Local repositories](#local-repositories)
-7. [EPEL](#epel)
-8. [The yum.repos.d directory](#the-yumreposd-directory)
-9. [Understanding a repo file](#understanding-a-repo-file)
-10. [The RHCSA practice question](#the-rhcsa-practice-question)
-11. [Step-by-step configuration](#step-by-step-configuration)
-12. [Verification and package installation](#verification-and-package-installation)
-13. [Troubleshooting](#troubleshooting)
-14. [Quick revision](#quick-revision)
-15. [Practice questions](#practice-questions)
-16. [Mirrorlist versus baseurl](#mirrorlist-versus-baseurl)
-17. [Rocky repository settings in detail](#rocky-repository-settings-in-detail)
-18. [Finding a package repository](#finding-a-package-repository)
-19. [Eight repository lab example](#eight-repository-lab-example)
-20. [DNF cache commands](#dnf-cache-commands)
-21. [Network checks in order](#network-checks-in-order)
-22. [Real job scenario and rollback](#real-job-scenario-and-rollback)
-23. [Completion checklist and review](#completion-checklist-and-review)
-24. [References](#references)
+> The domain names and URLs used in RHCSA exercises often work only inside the exam or training network. Do not expect example addresses such as `repo.eight.example.com` to work from a home lab.
 
-## What is a package?
+## Table of Contents
 
-A package is software prepared for installation. It contains program files and installation information. On RHEL and Rocky Linux, package files usually end in `.rpm`.
+1. [Learning objectives](#1-learning-objectives)
+2. [What is a software repository?](#2-what-is-a-software-repository)
+3. [DNF, YUM, and RPM](#3-dnf-yum-and-rpm)
+4. [BaseOS and AppStream](#4-baseos-and-appstream)
+5. [How DNF finds packages](#5-how-dnf-finds-packages)
+6. [Repository configuration files](#6-repository-configuration-files)
+7. [Important repository directives](#7-important-repository-directives)
+8. [Inspect the current repository state](#8-inspect-the-current-repository-state)
+9. [RHCSA-style repository task](#9-rhcsa-style-repository-task)
+10. [Safe step-by-step solution](#10-safe-step-by-step-solution)
+11. [Validate only the new repositories](#11-validate-only-the-new-repositories)
+12. [Install a package from selected repositories](#12-install-a-package-from-selected-repositories)
+13. [DNF cache commands](#13-dnf-cache-commands)
+14. [Troubleshooting workflow](#14-troubleshooting-workflow)
+15. [Security and GPG verification](#15-security-and-gpg-verification)
+16. [Backup and rollback](#16-backup-and-rollback)
+17. [Real-job scenario](#17-real-job-scenario)
+18. [Common mistakes](#18-common-mistakes)
+19. [Command reference](#19-command-reference)
+20. [Interview-ready answer](#20-interview-ready-answer)
+21. [Practice exercises](#21-practice-exercises)
+22. [Completion checklist](#22-completion-checklist)
+23. [Review questions](#23-review-questions)
 
-Examples: `nginx` is a web server; `git` manages source-code history; `htop` displays system activity.
+---
 
-Installing a package puts its files in the appropriate system locations. Downloading an RPM alone does not install it.
+## 1. Learning objectives
 
-## What is a repository?
+By the end of this project, you should be able to:
 
-A repository, or repo, is a collection of software packages plus metadata describing them. It gives your package manager a source from which to install and update software.
+- Explain what a Linux software repository is.
+- Explain the roles of DNF, YUM, and RPM.
+- Distinguish BaseOS from AppStream.
+- Read and create a `.repo` file.
+- Explain `mirrorlist`, `baseurl`, `enabled`, `gpgcheck`, and `gpgkey`.
+- Configure two repositories using supplied URLs.
+- Validate repository metadata without installing a package.
+- Force DNF to use only selected repositories.
+- Troubleshoot network, DNS, HTTP, metadata, and configuration problems.
+- Back up and roll back repository configuration safely.
 
-| Linux concept | Grocery store analogy |
-|---|---|
-| Repository | Store |
-| Package | Item |
-| Metadata | Catalog |
-| DNF/YUM | Helper who finds and collects items |
-| Repo configuration | Store address and instructions |
+---
 
-Here, “repository” means a package repository. A Git repository stores project files and version history; that is a different use of the word.
+## 2. What is a software repository?
 
-## YUM and DNF
+A software repository is a managed location that stores:
 
-YUM and DNF are package managers. They install, update, and remove packages. DNF is YUM's successor; on RHEL 9, the `yum` command is provided for compatibility with DNF.
+- RPM packages;
+- package metadata;
+- package versions;
+- dependency information;
+- checksums and signing information.
+
+Think of a repository as a software warehouse. The RPM files are the products, while repository metadata is the warehouse catalog.
+
+When you run:
 
 ```bash
-sudo dnf install nginx
-sudo dnf update nginx
-sudo dnf remove nginx
+sudo dnf install httpd
 ```
 
-These commands change the system. Run installation/removal commands only when needed for your lab task.
+DNF does not search the entire internet randomly. It reads enabled repository definitions, downloads or uses cached metadata, finds the requested package and dependencies, and then downloads the required RPM files.
 
-## Dependencies and metadata
+---
 
-**Dependencies** are other packages a program needs. DNF resolves them and includes the required packages in the installation transaction.
+## 3. DNF, YUM, and RPM
 
-**Metadata** is the repository catalog: package names, versions, dependencies, and other details. It is not the application itself.
+| Tool | Purpose |
+|---|---|
+| `rpm` | Installs, queries, verifies, or removes individual RPM packages at a low level |
+| `dnf` | High-level package manager that uses repositories and resolves dependencies |
+| `yum` | Compatibility command on modern RHEL/Rocky systems; commonly redirects to DNF |
 
-For a typical RPM repository, this file is an important metadata entry point:
+Examples:
+
+```bash
+rpm -q nginx
+dnf info nginx
+sudo dnf install nginx -y
+```
+
+- `rpm -q nginx` checks whether the package is installed.
+- `dnf info nginx` displays package information from installed or enabled repository data.
+- `dnf install nginx` resolves dependencies and installs the package.
+
+---
+
+## 4. BaseOS and AppStream
+
+RHEL and Rocky Linux 9 use BaseOS and AppStream as major repository groups.
+
+| Repository | Provides | Analogy |
+|---|---|---|
+| **BaseOS** | Kernel, core libraries, boot components, and essential operating-system tools | The foundation of a house |
+| **AppStream** | Applications, languages, runtimes, databases, and additional services | The tools and services placed inside the house |
+
+Both repositories are normally required for a complete system. A package may come from one repository while some of its dependencies come from another.
+
+Check which repository provides a package:
+
+```bash
+dnf info bash
+dnf info python3
+dnf info nginx
+```
+
+Look for a field such as `From repo` or `Repository` in the output.
+
+---
+
+## 5. How DNF finds packages
+
+The simplified request flow is:
+
+1. The administrator runs a DNF command.
+2. DNF reads configuration under `/etc/dnf/` and `/etc/yum.repos.d/`.
+3. DNF selects enabled repositories.
+4. DNF obtains repository metadata from a mirror list or direct base URL.
+5. DNF searches the metadata for the requested package.
+6. DNF calculates required dependencies.
+7. DNF downloads the RPM packages.
+8. Package signatures are checked when GPG verification is enabled.
+9. RPM installs the packages and updates the local RPM database.
 
 ```text
-repodata/repomd.xml
+dnf command
+    ↓
+.repo configuration
+    ↓
+mirrorlist or baseurl
+    ↓
+repository metadata
+    ↓
+RPM packages and dependencies
+    ↓
+signature verification
+    ↓
+installation
 ```
 
-Conceptually, DNF reads configuration, checks repository metadata, resolves packages and dependencies, retrieves packages, verifies them as configured, and installs them. Cached metadata or packages may be reused.
+---
 
-## BaseOS and AppStream
+## 6. Repository configuration files
 
-| Repository | Main purpose |
-|---|---|
-| BaseOS | Core operating system functionality |
-| AppStream | Additional applications, runtimes, and tools |
-
-Both are standard parts of RHEL's software distribution. A label in a `.repo` file does not determine its contents; the URL points to the actual content.
-
-## Local repositories
-
-A local repository provides packages from your own machine or an internal network. Organizations use them for controlled package distribution and environments with restricted internet access.
-
-| Source | Illustrative address |
-|---|---|
-| Same-machine directory | `file:///home/student/myrepo` |
-| Mounted installation media | `file:///mnt/rhel9/BaseOS` |
-| Internal web server | `http://repo.company.local/rhel9/BaseOS/` |
-
-These are examples, not confirmed lab paths. The directory must have valid repository metadata; a folder of RPMs alone is insufficient. Installation media commonly already supplies that metadata. Building a new repository may require a tool such as `createrepo_c`, but that is not the task in this question.
-
-## EPEL
-
-**EPEL = Extra Packages for Enterprise Linux.**
-
-EPEL is a Fedora community project providing additional packages for enterprise Linux distributions. Think of it as another software store alongside the operating system repositories.
-
-On Rocky Linux, you may encounter:
-
-```bash
-sudo dnf install epel-release
-```
-
-`epel-release` provides repository configuration and signing keys. It does not install every EPEL application. Setup prerequisites depend on your distribution and release.
-
-**EPEL is not required for the BaseOS/AppStream practice question.**
-
-## The yum.repos.d directory
+Repository definitions are normally stored in:
 
 ```text
 /etc/yum.repos.d/
 ```
 
-This directory contains repository configuration files ending in `.repo`. DNF reads these files to learn where repositories are and how to use them.
-
-```bash
-ls /etc/yum.repos.d/
-```
-
-The directory stores settings, not the complete package collection. One `.repo` file can define multiple repositories.
-
-## Understanding a repo file
-
-Illustrative configuration:
-
-```ini
-[practice-baseos]
-name=Practice BaseOS
-baseurl=http://repo.example.com/rhel9/BaseOS/
-enabled=1
-gpgcheck=1
-gpgkey=file:///path/to/trusted-signing-key
-```
-
-| Field | Meaning |
-|---|---|
-| `[practice-baseos]` | Unique repository ID used in commands |
-| `name=` | Human-readable description |
-| `baseurl=` | Repository location, normally above `repodata/` |
-| `enabled=1` | Enable the repository |
-| `enabled=0` | Disable it by default |
-| `gpgcheck=1` | Check package signatures |
-| `gpgcheck=0` | Disable package signature checking |
-| `gpgkey=` | Location of a trusted signing key |
-
-The URL and key path above are placeholders. Use the lab's actual values. Some repositories use `mirrorlist=` or `metalink=` to locate mirrors instead of a fixed `baseurl=`.
-
-## The RHCSA practice question
-
-The supplied question asks you to configure repositories on `servera` so packages are available through YUM/DNF.
-
-Both supplied URLs are:
-
-```text
-http://content.example.com/rhel9.0/x86_64/rhcsa-practice/rht
-```
-
-**Important: the BaseOS and AppStream URLs are identical.** They may be incomplete or copied incorrectly. Two differently named entries using the same URL still access the same source. Do not assume that adding `/BaseOS` or `/AppStream` will fix it; confirm the paths in the lab instructions or inspect the server's directory listing if one is available.
-
-This is the user's supplied practice question, not a verified official exam question. The lab endpoint has not been tested from these notes.
-
-## Step-by-step configuration
-
-### Step 1: Work on the correct machine
-
-Use the console or SSH access provided for `servera`. Check:
-
-```bash
-hostname
-```
-
-### Step 2: Check the supplied repository metadata
-
-Run inside the lab environment:
-
-```bash
-curl -fL http://content.example.com/rhel9.0/x86_64/rhcsa-practice/rht/repodata/repomd.xml
-```
-
-XML output suggests the metadata entry point is accessible. It does not prove that every referenced metadata file or package is accessible. A 404 suggests an incorrect or incomplete path. A DNS error means the hostname could not be resolved.
-
-The hostname may only resolve inside the lab network. Failure from your home computer does not establish that the lab URL is invalid.
-
-### Step 3: Create a configuration file
-
-```bash
-sudo vi /etc/yum.repos.d/practice.repo
-```
-
-In `vi`: press `i` to insert text; after editing, press `Esc`, type `:wq`, and press Enter to save and exit.
-
-If the lab confirms the supplied identical URLs, the following reflects them exactly:
-
-```ini
-[practice-baseos]
-name=Practice BaseOS
-baseurl=http://content.example.com/rhel9.0/x86_64/rhcsa-practice/rht
-enabled=1
-gpgcheck=0
-
-[practice-appstream]
-name=Practice AppStream
-baseurl=http://content.example.com/rhel9.0/x86_64/rhcsa-practice/rht
-enabled=1
-gpgcheck=0
-```
-
-**This defines two IDs pointing to one source. It does not establish separate BaseOS and AppStream content.** If the question provides corrected URLs, put the correct URL in each corresponding entry.
-
-Here, `gpgcheck=0` assumes the lab permits disabling package signature checking. If a signing key is supplied or signature checks are required, use `gpgcheck=1` with the correct trusted key configuration.
-
-### Step 4: Inspect your saved configuration
-
-```bash
-cat /etc/yum.repos.d/practice.repo
-```
-
-Check spelling, brackets, unique IDs, URLs, and the `.repo` filename extension.
-
-## Verification and package installation
-
-List enabled repositories:
-
-```bash
-dnf repolist
-```
-
-Seeing a repository listed shows configuration is recognized; it does not prove the URL works.
-
-Refresh metadata only for the two configured IDs:
-
-```bash
-sudo dnf --disablerepo='*' \
-  --enablerepo=practice-baseos \
-  --enablerepo=practice-appstream \
-  makecache --refresh
-```
-
-`--disablerepo='*'` excludes other repositories for this command only. The two `--enablerepo` options select your configured IDs. These options do not permanently disable the other repositories.
-
-To test each source separately:
-
-```bash
-sudo dnf --disablerepo='*' --enablerepo=practice-baseos makecache --refresh
-sudo dnf --disablerepo='*' --enablerepo=practice-appstream makecache --refresh
-```
-
-If a package is requested, install it using the same repository selection as needed:
-
-```bash
-sudo dnf --disablerepo='*' \
-  --enablerepo=practice-baseos \
-  --enablerepo=practice-appstream \
-  install PACKAGE_NAME
-```
-
-Replace `PACKAGE_NAME` with the requested package. A successful installation is stronger evidence than `repolist` alone. Do not install an arbitrary package if the question only asks for configuration.
-
-## Troubleshooting
-
-| Symptom | Likely area to investigate | Useful check |
-|---|---|---|
-| Could not resolve host | DNS or incorrect hostname | `getent hosts content.example.com` |
-| HTTP 404 | Incorrect repository path | Check `baseurl` and `repodata/repomd.xml` |
-| Connection timed out | Routing, firewall, or server availability | `ip route`; test URL with `curl` |
-| Connection refused | Service unavailable at destination | Check server/service in the lab |
-| Repo missing from enabled list | Disabled entry, wrong file extension, or configuration error | `dnf repolist --all` |
-| Cannot download repomd.xml | URL, metadata, DNS, or network issue | Test metadata URL and read DNF error |
-| No match for argument | Package unavailable in selected repos or wrong name | `dnf search PACKAGE_NAME` |
-| GPG/signature error | Missing or incorrect trusted key, or invalid signature | Review lab key instructions |
-| Duplicate repo ID warning | Same bracketed ID in multiple entries | Inspect `.repo` files |
-
-Do not delete existing repository files to solve a new configuration task. Do not disable signature checks merely to hide an unexplained signature failure.
-
-## Quick revision
-
-| Term | One-line meaning |
-|---|---|
-| RPM package | Software prepared for installation |
-| Repository | Packages plus metadata |
-| DNF/YUM | Package manager |
-| Local repo | Repository on your machine or internal network |
-| EPEL | Additional enterprise Linux packages |
-| `/etc/yum.repos.d/` | Repository configuration directory |
-| `.repo` | Repository configuration filename extension |
-| `baseurl` | Address of repository content |
-| `repodata` | Repository metadata directory |
-
-Exam workflow: **correct machine → correct URLs → create `.repo` file → inspect settings → refresh metadata → install requested package if required.**
-
-## Practice questions
-
-1. Does `/etc/yum.repos.d/` hold all available RPM packages?
-2. What is the difference between DNF and a repository?
-3. What does `enabled=1` mean?
-4. Does installing `epel-release` install all EPEL software?
-5. Why is `dnf repolist` alone insufficient to validate a URL?
-6. Do two repository labels using the same URL create two different sources?
-7. What file can you request to check the metadata entry point?
-
-### Answers
-
-1. No. It normally holds repository configuration files.
-2. DNF manages installation; a repository supplies packages and metadata.
-3. The repository is enabled by default.
-4. No. It installs repository configuration and signing keys.
-5. A configured repository can be listed even when its server is unreachable.
-6. No. They point to the same location.
-7. `repodata/repomd.xml`, relative to the repository base URL.
-
-## Mirrorlist versus baseurl
-
-The attached project explains the difference between Rocky's public mirrors and a direct lab repository server.
-
-| Setting | What DNF does |
-|---|---|
-| `baseurl=` | Retrieves metadata and packages directly from the supplied repository address |
-| `mirrorlist=` | Requests mirror addresses from a service, then retrieves packages from a mirror |
-| `#baseurl=` | Treats the line as a comment; it is inactive |
-
-The mirrorlist service acts as an address directory. Mirror servers hold the package content. A `baseurl` can point to an internet server, an internal server, or a local `file://` location.
-
-## Rocky repository settings in detail
-
-Inspect the actual configuration on your VM:
+List the files:
 
 ```bash
 ls -l /etc/yum.repos.d/
-cat /etc/yum.repos.d/rocky.repo
 ```
 
-The filename may differ on your installation. A shortened example from the attached project:
+Important rule:
+
+> A repository configuration filename must end in `.repo`.
+
+Examples:
+
+```text
+/etc/yum.repos.d/rocky.repo
+/etc/yum.repos.d/redhat.repo
+/etc/yum.repos.d/eight.repo
+```
+
+A single `.repo` file can contain multiple repository blocks. Every block begins with a repository ID inside square brackets.
 
 ```ini
-[baseos]
-name=Rocky Linux $releasever - BaseOS
-mirrorlist=https://mirrors.rockylinux.org/mirrorlist?arch=$basearch&repo=BaseOS-$releasever$rltype
-#baseurl=http://dl.rockylinux.org/$contentdir/$releasever/BaseOS/$basearch/os/
-gpgcheck=1
+[example-baseos]
+name=Example BaseOS
+baseurl=http://repo.example.com/BaseOS
 enabled=1
-countme=1
-metadata_expire=6h
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9
+gpgcheck=0
+
+[example-appstream]
+name=Example AppStream
+baseurl=http://repo.example.com/AppStream
+enabled=1
+gpgcheck=0
 ```
 
-This is an explanatory example. Do not overwrite a working `rocky.repo` with it.
+Repository IDs must be unique across all `.repo` files. Do not create another `[baseos]` block if an enabled repository with that ID already exists.
 
-| Setting | Meaning |
+---
+
+## 7. Important repository directives
+
+| Directive | Meaning |
 |---|---|
-| `$releasever` | DNF substitutes the distribution release value, such as `9` |
-| `$basearch` | System architecture, such as `x86_64` or `aarch64` |
-| `$rltype` | Rocky variable used in repository naming |
-| `$contentdir` | Rocky variable used in its content path |
-| `countme=1` | Helps estimate the number of systems using mirrors through repository requests |
-| `metadata_expire=6h` | Cached metadata expires after six hours and is refreshed when needed |
-| `gpgkey=file:///...` | Location of the trusted public signing key on this machine |
+| `[repo-id]` | Unique identifier used by DNF commands |
+| `name=` | Human-readable repository name |
+| `baseurl=` | Direct URL of a repository server |
+| `mirrorlist=` | URL of a service that returns possible repository mirror addresses |
+| `enabled=1` | Repository is enabled and may be used |
+| `enabled=0` | Repository exists but is disabled by default |
+| `gpgcheck=1` | Verify RPM package signatures |
+| `gpgcheck=0` | Do not verify RPM package signatures |
+| `gpgkey=` | Location of the trusted public signing key |
+| `metadata_expire=` | How long cached metadata may be considered current |
 
-**`metadata_expire=6h` does not mean installed software expires after six hours.** DNF does not necessarily run a background refresh when that time passes; it checks freshness when metadata is needed.
+### `mirrorlist` versus `baseurl`
 
-DNF substitutes the variables. You normally do not need to replace them manually with fixed values.
+`mirrorlist=` points to a service that gives DNF a list of suitable package servers. The mirror-list service is not itself necessarily the package warehouse.
 
-## Finding a package repository
+`baseurl=` sends DNF directly to a specific repository location.
 
-```bash
-dnf info bash
-dnf info python3
-dnf info --available httpd
+```ini
+mirrorlist=https://mirrors.rockylinux.org/mirrorlist?...
 ```
 
-Inspect the `Repository` field. An installed package may show `@System` and may also have a `From repo` field. Use `--available` to inspect available package sources.
+```ini
+baseurl=http://repo.eight.example.com/BaseOS
+```
+
+If the exam provides exact repository URLs, use those URLs as `baseurl` values.
+
+### DNF variables
+
+Common variables include:
+
+| Variable | Meaning |
+|---|---|
+| `$releasever` | Operating-system release used by DNF, such as `9` |
+| `$basearch` | Base architecture, such as `x86_64` or `aarch64` |
+
+DNF substitutes these variables automatically. You normally do not replace them manually inside a vendor-provided repository file.
+
+---
+
+## 8. Inspect the current repository state
+
+### 8.1 List enabled repositories
 
 ```bash
 dnf repolist
+```
+
+Example:
+
+```text
+repo id              repo name
+appstream            Rocky Linux 9 - AppStream
+baseos               Rocky Linux 9 - BaseOS
+extras               Rocky Linux 9 - Extras
+```
+
+### 8.2 List enabled and disabled repositories
+
+```bash
 dnf repolist --all
 ```
 
-The first command lists enabled repositories; the second includes disabled entries. Output depends on your VM's configuration. The attached sample is not an exact expected output for every VM.
+### 8.3 Display detailed repository information
 
-## Eight repository lab example
-
-The attached file provides a second practice example with separate URLs:
-
-```text
-http://repo.eight.example.com/BaseOS
-http://repo.eight.example.com/AppStream
+```bash
+dnf repoinfo
 ```
 
-These are different from the earlier `content.example.com` URLs. They are not a confirmed correction to that first question. Use the URLs supplied for each particular lab.
+### 8.4 Inspect repository configuration
 
-### Create the configuration
+```bash
+sudo grep -R --line-number --extended-regexp \
+  '^\[|^name=|^baseurl=|^mirrorlist=|^enabled=|^gpgcheck=|^gpgkey=' \
+  /etc/yum.repos.d/
+```
+
+This displays the important active directives without printing every comment.
+
+### 8.5 Confirm the correct machine
+
+```bash
+hostnamectl
+whoami
+cat /etc/os-release
+```
+
+Always confirm the target system before modifying package sources.
+
+---
+
+## 9. RHCSA-style repository task
+
+Example task:
+
+> Configure repositories available from:
+>
+> `http://repo.eight.example.com/BaseOS`
+>
+> `http://repo.eight.example.com/AppStream`
+
+The task requires:
+
+- one or more valid `.repo` files;
+- two unique repository IDs;
+- exact `baseurl` values supplied by the question;
+- enabled repositories;
+- an appropriate GPG configuration based on the exam instructions and available key;
+- successful metadata validation.
+
+The example domain may be reachable only inside the exam environment.
+
+---
+
+## 10. Safe step-by-step solution
+
+### Step 1: Confirm existing IDs
+
+```bash
+dnf repolist --all
+```
+
+Do not reuse existing IDs such as `baseos` or `appstream`. In this guide, the new IDs are:
+
+```text
+eight-baseos
+eight-appstream
+```
+
+### Step 2: Back up the current repository directory
+
+```bash
+timestamp="$(date '+%Y-%m-%d-%H-%M-%S')"
+sudo cp -a /etc/yum.repos.d \
+  "/root/yum.repos.d.backup-$timestamp"
+```
+
+Verify:
+
+```bash
+sudo ls -ld "/root/yum.repos.d.backup-$timestamp"
+```
+
+### Step 3: Test the supplied locations
+
+```bash
+curl -I --max-time 10 http://repo.eight.example.com/BaseOS/
+curl -I --max-time 10 http://repo.eight.example.com/AppStream/
+```
+
+An HTTP response proves the web server is reachable, but DNF metadata validation is still required. Some repository servers may not support `HEAD`; if `curl -I` is inconclusive, continue with `dnf makecache` and inspect its exact error.
+
+### Step 4: Create the repository file
 
 ```bash
 sudo vi /etc/yum.repos.d/eight.repo
 ```
+
+Add:
 
 ```ini
 [eight-baseos]
@@ -418,183 +375,523 @@ enabled=1
 gpgcheck=0
 ```
 
-The signature-checking assumption explained earlier also applies here. A question omitting a key does not by itself establish that `gpgcheck=0` is required.
+> `gpgcheck=0` is shown only for a controlled exercise where no key is supplied and the task expects this configuration. In a real environment, use `gpgcheck=1` and configure the approved `gpgkey` whenever signed packages and a trusted key are available.
 
-**Keep repository IDs unique across all `.repo` files.** If Rocky already uses `[baseos]`, use a distinct ID such as `[eight-baseos]` in the new file. Changing `name=` alone does not change the repository ID.
-
-### Verify metadata and configuration
+### Step 5: Check syntax-level details
 
 ```bash
-curl -fL --max-time 10 http://repo.eight.example.com/BaseOS/repodata/repomd.xml
-curl -fL --max-time 10 http://repo.eight.example.com/AppStream/repodata/repomd.xml
-sudo dnf --disablerepo='*' --enablerepo=eight-baseos --enablerepo=eight-appstream makecache --refresh
-dnf --disablerepo='*' --enablerepo=eight-baseos --enablerepo=eight-appstream repolist
+sudo cat /etc/yum.repos.d/eight.repo
+sudo stat /etc/yum.repos.d/eight.repo
 ```
 
-The `curl` commands test metadata entry points. A successful DNF metadata refresh provides a more complete check. A lab hostname may be unavailable from your home network.
+Confirm:
 
-### Install Apache if the task requires it
+- the filename ends in `.repo`;
+- both IDs use the intended spelling and case;
+- both URLs exactly match the task;
+- each directive uses `key=value` syntax;
+- there are no duplicate IDs.
+
+### Step 6: Refresh metadata
 
 ```bash
-dnf --disablerepo='*' --enablerepo=eight-baseos --enablerepo=eight-appstream info --available httpd
-sudo dnf --disablerepo='*' --enablerepo=eight-baseos --enablerepo=eight-appstream install httpd
+sudo dnf clean all
+sudo dnf makecache
+```
+
+### Step 7: Confirm both repositories
+
+```bash
+dnf repolist --all | grep -E 'eight-(baseos|appstream)'
+```
+
+Expected conceptually:
+
+```text
+eight-appstream    Eight AppStream    enabled
+eight-baseos       Eight BaseOS       enabled
+```
+
+---
+
+## 11. Validate only the new repositories
+
+To ensure the new repository definitions work independently, temporarily disable every repository and enable only the two new IDs:
+
+```bash
+sudo dnf makecache \
+  --disablerepo='*' \
+  --enablerepo='eight-baseos,eight-appstream'
+```
+
+List only the selected repositories:
+
+```bash
+dnf repolist \
+  --disablerepo='*' \
+  --enablerepo='eight-baseos,eight-appstream'
+```
+
+Important:
+
+> Repository IDs are exact strings. Use `eight-baseos` and `eight-appstream` consistently. Do not change them to `Eightbaseos`, remove the hyphen, or alter their case.
+
+---
+
+## 12. Install a package from selected repositories
+
+First check whether the package is available:
+
+```bash
+dnf info httpd \
+  --disablerepo='*' \
+  --enablerepo='eight-baseos,eight-appstream'
+```
+
+Install it only when the preceding checks are successful:
+
+```bash
+sudo dnf install -y httpd \
+  --disablerepo='*' \
+  --enablerepo='eight-baseos,eight-appstream'
+```
+
+Verify the installed RPM:
+
+```bash
 rpm -q httpd
 ```
 
-`rpm -q httpd` checks the local RPM database for installation. It does not by itself prove that Apache is running or identify the installation source.
+`rpm -q` confirms package installation in the local RPM database. It does not prove which repository currently provides the package; use DNF information and transaction history for that investigation.
 
-**Correction to the attached project:** some commands used `Eightbaseos,Eightappstream`, while the configured IDs were `eight-baseos` and `eight-appstream`. All commands above use IDs matching the configuration. Match spelling and case exactly.
+```bash
+sudo dnf history info last
+```
 
-## DNF cache commands
+---
 
-Think of the cache as a saved copy of a store catalog.
+## 13. DNF cache commands
+
+Think of the cache as DNF's saved copy of a store catalog.
 
 | Command | Purpose |
 |---|---|
-| `sudo dnf clean all` | Removes cached metadata and cached packages; does not remove installed software |
-| `sudo dnf makecache` | Prepares metadata caches for enabled repositories; fresh caches may be reused |
-| `sudo dnf makecache --refresh` | Expires metadata and checks freshness again |
-| `sudo dnf install httpd` | Installs the package and its dependencies |
+| `dnf clean all` | Removes cached repository metadata and cached packages managed by DNF |
+| `dnf makecache` | Downloads fresh metadata for enabled repositories |
+| `dnf repolist` | Lists enabled repositories |
+| `dnf repolist --all` | Lists enabled and disabled repositories |
+| `dnf info PACKAGE` | Shows package information from installed/enabled sources |
 
-You do not need `clean all` before every installation. A targeted `makecache --refresh` is usually sufficient to validate a newly configured repository. Select the intended repository IDs to avoid unrelated repository failures.
-
-## Network checks in order
-
-Access to a repository may depend on a working interface, IP address, route, name resolution, and HTTP service.
-
-### Interface and IP address
+After creating or changing a repository definition, these commands make validation clearer:
 
 ```bash
-ip -br link
-ip -br address
+sudo dnf clean all
+sudo dnf makecache
+```
+
+You do not need to run `dnf clean all` before every package installation. DNF normally manages metadata freshness automatically.
+
+---
+
+## 14. Troubleshooting workflow
+
+Troubleshoot from the system outward. Do not change several layers at once.
+
+### 14.1 Confirm interface state
+
+```bash
 nmcli device status
-nmcli connection show
+ip -br address
 ```
 
-`nmcli connection show` lists connection profiles; it does not by itself prove a physical cable is healthy. A VM uses a virtual NIC, so virtual links and hypervisor networking also matter.
-
-If `ethtool` is available:
+For a physical or virtual Ethernet interface:
 
 ```bash
-sudo ethtool INTERFACE_NAME
+sudo ethtool enX0 | grep 'Link detected'
 ```
 
-Replace `INTERFACE_NAME` with your actual interface, such as `enX0`. `Link detected: yes` indicates a link, not complete connectivity.
+Replace `enX0` with the actual interface name.
 
-### Routing and gateway
+### 14.2 Confirm routing
 
 ```bash
-ip route
+ip -4 route
 ```
 
-A default gateway sends traffic to other networks. A repository on the same local subnet normally uses an on-link route and does not require the default gateway for that connection.
+Look for a valid default route:
 
-### Name resolution
+```text
+default via 192.168.1.254 dev enX0
+```
+
+Test the configured gateway, not an assumed address:
+
+```bash
+ping -c 2 192.168.1.254
+```
+
+### 14.3 Confirm DNS configuration
 
 ```bash
 cat /etc/resolv.conf
 getent hosts repo.eight.example.com
 ```
 
-`/etc/resolv.conf` shows DNS resolver configuration. The DNS server is not necessarily your home router.
+`getent hosts` uses the system's normal name-service configuration, including `/etc/hosts` and DNS according to `/etc/nsswitch.conf`.
 
-`getent` means “get entries.” With `hosts`, it uses the system's host lookup rules in `/etc/nsswitch.conf`, which may include `/etc/hosts`, DNS, and other sources. Receiving an IP address proves successful system name resolution, but not necessarily that DNS supplied the answer.
-
-If `dig` and `nslookup` are already available:
+If available:
 
 ```bash
 dig repo.eight.example.com
 nslookup repo.eight.example.com
 ```
 
-These tools query DNS. On Rocky Linux 9 they are provided by `bind-utils`:
+On Rocky Linux, `dig` and `nslookup` are provided by `bind-utils`:
 
 ```bash
-sudo dnf install bind-utils
+sudo dnf install bind-utils -y
 ```
 
-When repositories are already failing, installing a troubleshooting tool may also fail. Start with tools available on the system.
+This installation itself requires at least one working repository.
 
-### Ping and HTTP
+### 14.4 Confirm HTTP connectivity
 
 ```bash
-ping -c 3 repo.eight.example.com
-curl -fL --max-time 10 http://repo.eight.example.com/BaseOS/repodata/repomd.xml
+curl -I --max-time 10 http://repo.eight.example.com/BaseOS/
+curl -I --max-time 10 http://repo.eight.example.com/AppStream/
 ```
 
-Ping uses ICMP rather than TCP or UDP ports. Successful ping does not prove HTTP works. Failed ping does not necessarily prove HTTP is unavailable because ICMP may be blocked.
+Useful interpretations:
 
-`curl -I` requests HTTP headers using HEAD. A successful directory response does not prove repository metadata is available, and some servers reject HEAD requests. Fetching the metadata file with GET and refreshing it through DNF are more useful repository checks.
+| Result | Possible meaning |
+|---|---|
+| `Could not resolve host` | DNS or hostname problem |
+| `Connection timed out` | Routing, firewall, VPN, or remote-server problem |
+| `Connection refused` | Host reachable but service not listening on that port |
+| `404 Not Found` | URL path may be wrong |
+| `200`, `301`, or `302` | Web endpoint responded; continue with DNF metadata test |
 
-## Real job scenario and rollback
-
-The attached project's business scenario describes NEXUS, a company requiring software installation and updates from approved repositories. Another team has prepared the repository server. Your job is to configure clients to use it and validate patching.
-
-Suggested sequence:
-
-1. Record the current state on a test VM.
-2. Back up repository configuration.
-3. Configure approved URLs and trusted keys.
-4. Test metadata and the requested package.
-5. Apply the change to a pilot group with Ansible.
-6. After validation, use a playbook and Automation Controller for a wider rollout.
-7. Record evidence and rollback steps.
-
-### Back up configuration in your home directory
+### 14.5 Confirm repository IDs and URLs
 
 ```bash
-backup_dir="$HOME/repo-backups/$(date +%Y%m%d-%H%M%S)"
-mkdir -p "$backup_dir"
-sudo cp -a /etc/yum.repos.d "$backup_dir/"
-dnf repolist --all > "$backup_dir/repolist-before.txt"
-rpm -qa | sort > "$backup_dir/packages-before.txt"
+sudo cat /etc/yum.repos.d/eight.repo
+dnf repolist --all
 ```
 
-This backs up repository configuration and records package inventory. **It does not back up installed package contents, application data, or the entire VM.** Patching rollback requires a suitable snapshot/backup and a tested recovery plan separately.
-
-### Roll back only the new eight.repo configuration
+### 14.6 Request verbose DNF diagnostics
 
 ```bash
-sudo mv /etc/yum.repos.d/eight.repo "$backup_dir/eight.repo.disabled"
+sudo dnf -v makecache \
+  --disablerepo='*' \
+  --enablerepo='eight-baseos,eight-appstream'
+```
+
+Read the first meaningful error. Later messages may be consequences of the original failure.
+
+### 14.7 Common metadata error
+
+If DNF reports that `repomd.xml` cannot be downloaded, possible causes include:
+
+- incorrect `baseurl`;
+- missing repository metadata on the server;
+- DNS failure;
+- routing or firewall failure;
+- exam VPN/network not connected;
+- proxy requirement;
+- repository server unavailable.
+
+---
+
+## 15. Security and GPG verification
+
+`gpgcheck=1` tells DNF to verify that an RPM was signed by a trusted key.
+
+Example secure configuration:
+
+```ini
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9
+```
+
+`file://` means the key is stored on the local system.
+
+Important rules:
+
+- Prefer signature verification in real environments.
+- Do not disable GPG checking merely because it is easier.
+- An exam question that does not print a key does not automatically prove that no suitable key exists on the system.
+- Follow the task requirements and inspect available keys.
+- Document any approved exception that uses `gpgcheck=0`.
+
+List available RPM-GPG keys:
+
+```bash
+ls -l /etc/pki/rpm-gpg/
+```
+
+---
+
+## 16. Backup and rollback
+
+### 16.1 Backup before modification
+
+```bash
+timestamp="$(date '+%Y-%m-%d-%H-%M-%S')"
+sudo cp -a /etc/yum.repos.d \
+  "/root/yum.repos.d.backup-$timestamp"
+```
+
+### 16.2 Roll back the custom file
+
+Preview the exact target:
+
+```bash
+sudo ls -l /etc/yum.repos.d/eight.repo
+```
+
+Remove only the custom file:
+
+```bash
+sudo rm -f -- /etc/yum.repos.d/eight.repo
+```
+
+Refresh metadata:
+
+```bash
+sudo dnf clean all
+sudo dnf makecache
+```
+
+### 16.3 Restore the complete repository directory
+
+Only when a complete rollback is required, select the exact backup directory:
+
+```bash
+sudo ls -ld /root/yum.repos.d.backup-*
+```
+
+Then restore deliberately. Do not use an unresolved wildcard as the source when multiple backups exist.
+
+Example after replacing the timestamp:
+
+```bash
+sudo cp -a \
+  /root/yum.repos.d.backup-YYYY-MM-DD-HH-MM-SS/. \
+  /etc/yum.repos.d/
+
+sudo dnf clean all
+sudo dnf makecache
+```
+
+Restoring files does not automatically remove unrelated `.repo` files created after the backup. Review the directory carefully.
+
+---
+
+## 17. Real-job scenario
+
+### Business requirement
+
+A company allows software installation only from approved internal repositories. Another infrastructure team has already built the repository server. The Linux administration team must point managed servers to the approved sources.
+
+### Implementation stages
+
+1. Test the URLs and configuration on one non-production VM.
+2. Record the original repository state.
+3. Back up current configuration.
+4. Create a uniquely named repository file.
+5. Validate metadata using only the new repository IDs.
+6. Install or query a test package.
+7. Collect evidence and application health checks.
+8. Convert the proven manual process into Ansible automation.
+9. Pilot on a small host group.
+10. Roll out in controlled batches.
+11. Monitor failures and maintain rollback instructions.
+
+### Why a pilot matters
+
+A syntactically correct `.repo` file can still point to the wrong content, architecture, release, or security key. A pilot validates the complete behavior before a company-wide change.
+
+---
+
+## 18. Common mistakes
+
+### Mistake 1: Duplicate repository IDs
+
+Incorrect approach:
+
+```ini
+[baseos]
+```
+
+when `[baseos]` already exists elsewhere.
+
+Better:
+
+```ini
+[eight-baseos]
+```
+
+### Mistake 2: Inconsistent ID spelling
+
+Configured:
+
+```ini
+[eight-baseos]
+```
+
+Incorrect command:
+
+```bash
+--enablerepo=Eightbaseos
+```
+
+Correct:
+
+```bash
+--enablerepo=eight-baseos
+```
+
+### Mistake 3: Assuming example URLs work everywhere
+
+Exam and training domains may be private. Test from the correct exam/lab network.
+
+### Mistake 4: Disabling GPG checking without justification
+
+Use `gpgcheck=0` only when the controlled exercise or approved repository design requires it.
+
+### Mistake 5: Testing with all repositories enabled
+
+The package may come from an old repository, hiding a failure in the new one. Use:
+
+```bash
+--disablerepo='*' --enablerepo='eight-baseos,eight-appstream'
+```
+
+### Mistake 6: Skipping backup and rollback
+
+Always preserve the original state before editing repository sources.
+
+### Mistake 7: Editing vendor repository files unnecessarily
+
+Prefer a separate, clearly named custom `.repo` file. It is easier to audit and remove.
+
+---
+
+## 19. Command reference
+
+| Command | Purpose |
+|---|---|
+| `dnf repolist` | List enabled repositories |
+| `dnf repolist --all` | List enabled and disabled repositories |
+| `dnf repoinfo` | Display repository details |
+| `dnf info PACKAGE` | Display package information |
+| `dnf clean all` | Clear DNF cache |
+| `dnf makecache` | Download fresh metadata |
+| `dnf -v makecache` | Refresh metadata with verbose diagnostics |
+| `--disablerepo='*'` | Temporarily disable every repository for one command |
+| `--enablerepo='ID1,ID2'` | Temporarily enable selected repository IDs |
+| `rpm -q PACKAGE` | Query the local RPM database |
+| `dnf history info last` | Inspect the latest DNF transaction |
+| `getent hosts NAME` | Test system-level hostname resolution |
+| `curl -I URL` | Request HTTP headers from a URL |
+| `ip -4 route` | Display IPv4 routes and default gateway |
+| `nmcli device status` | Show NetworkManager device state |
+
+---
+
+## 20. Interview-ready answer
+
+> First, I would confirm the correct server, operating-system version, network connectivity, and current repository state. I would back up `/etc/yum.repos.d` before making changes. Then I would create a separate `.repo` file with unique repository IDs, the exact BaseOS and AppStream URLs supplied by the task, `enabled=1`, and the appropriate GPG settings. After saving the file, I would clear stale metadata when necessary and run `dnf makecache`. I would then disable all other repositories temporarily and enable only the new IDs to prove that they work independently. Finally, I would query or install a test package, record the evidence, and retain a tested rollback procedure.
+
+---
+
+## 21. Practice exercises
+
+### Exercise 1: Repository discovery
+
+Run:
+
+```bash
 dnf repolist
+dnf repolist --all
+dnf repoinfo
 ```
 
-This example assumes the same shell still has `backup_dir` set. In a new session, supply the actual backup path. Moving the file out of the repository directory prevents DNF from loading its entries. It does not downgrade or uninstall packages. If you modified an existing file, restore that particular file from its backup rather than blindly overwriting the entire directory.
+Answer:
 
-Repository files persist on disk across reboots. Rebooting is not required every time merely to establish that a file is saved; verify after reboot when the task or maintenance plan requires it.
+1. Which repositories are enabled?
+2. Which are disabled?
+3. Which repository provides `bash`?
 
-## Completion checklist and review
+### Exercise 2: Configuration reading
 
-- [ ] Confirmed the correct VM.
-- [ ] Checked URLs and repository IDs.
-- [ ] Backed up configuration when needed.
-- [ ] Saved and inspected the `.repo` file.
-- [ ] Successfully refreshed metadata for the intended repositories.
-- [ ] Installed and verified the requested package, if required.
-- [ ] Kept existing security settings unless a justified change was required.
-- [ ] Recorded evidence and understood configuration rollback.
-- [ ] Distinguished patching rollback from repository rollback.
+Choose one `.repo` file and identify:
 
-Review questions:
+- repository ID;
+- readable name;
+- `mirrorlist` or `baseurl`;
+- enabled state;
+- GPG-check state;
+- GPG-key location.
 
-1. What business problem was solved? **Controlled software distribution and patching from approved sources.**
-2. Which command lists enabled configuration? **`dnf repolist`.**
-3. Which command verifies metadata access? **Targeted `dnf makecache --refresh`.**
-4. Why is the configuration persistent? **It is saved in a `.repo` file on disk.**
-5. How do repository rollback and patch rollback differ? **Repository rollback restores source settings; patch rollback restores software/data state.**
+### Exercise 3: Controlled custom repository
 
-The attached Markdown references image files using relative paths, but those images were not attached. This combined document uses text explanations and tables in their place to avoid broken images.
+In an authorized lab, create two uniquely named repository blocks using URLs supplied by the instructor. Then validate them with all other repositories disabled.
 
-## References
+### Exercise 4: Failure simulation
 
-- User-provided project: `RHCSA_Project_02_software-repositories(1).md`.
-- [DNF configuration reference](https://dnf.readthedocs.io/en/latest/conf_ref.html)
-- [Red Hat: RHEL 9 repositories](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/considerations_in_adopting_rhel_9/ref_repositories_considerations-in-adopting-rhel-9)
+With a disposable test configuration, introduce one error at a time:
 
-- [Red Hat: Managing custom software repositories, RHEL 9](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/managing_software_with_the_dnf_tool/assembly_managing-custom-software-repositories_managing-software-with-the-dnf-tool)
-- [DNF command reference](https://dnf.readthedocs.io/en/latest/command_ref.html)
-- [Fedora: EPEL FAQ](https://fedoraproject.org/wiki/EPEL/FAQ)
-- [Fedora: epel-release package](https://packages.fedoraproject.org/pkgs/epel-release/epel-release/)
-- [User's YouTube reference](https://www.youtube.com/live/HRKvoIqJvbc?si=am7_lUEKMiw77OqJ) — video contents could not be retrieved; these notes do not claim to summarize it.
+- misspell the hostname;
+- use the wrong URL path;
+- use the wrong repository ID in `--enablerepo`;
+- disable one required repository.
 
-[Back to topic index](#topic-index)
+Record the exact error and the command that identified its cause.
+
+---
+
+## 22. Completion checklist
+
+- [ ] Correct VM confirmed
+- [ ] OS and release confirmed
+- [ ] Current repositories recorded
+- [ ] Backup created before modification
+- [ ] Repository IDs are unique
+- [ ] BaseOS URL matches the task exactly
+- [ ] AppStream URL matches the task exactly
+- [ ] Repositories are enabled
+- [ ] GPG configuration is appropriate and documented
+- [ ] `dnf makecache` succeeds
+- [ ] New repositories work with all others disabled
+- [ ] Test package can be queried or installed
+- [ ] DNF transaction evidence collected
+- [ ] SELinux remains enforcing unless the task explicitly says otherwise
+- [ ] Firewall state remains as required
+- [ ] Rollback steps are understood and tested safely
+
+---
+
+## 23. Review questions
+
+1. What is the difference between a repository and an RPM package?
+2. What roles do DNF and RPM perform?
+3. What is the difference between BaseOS and AppStream?
+4. What is the difference between `mirrorlist` and `baseurl`?
+5. Why must repository IDs be unique?
+6. What does `enabled=1` mean?
+7. What security control does `gpgcheck=1` provide?
+8. What does `dnf clean all` remove?
+9. What does `dnf makecache` download?
+10. Why should you test with all unrelated repositories disabled?
+11. How would you distinguish a DNS problem from an HTTP-path problem?
+12. Why might an RHCSA example URL fail in a home lab?
+13. Which command confirms that a package is installed?
+14. How would you roll back a custom repository configuration?
+15. Why should this change be piloted before company-wide automation?
+
+---
+
+## Final summary
+
+A repository configuration tells DNF where software and metadata are located. A reliable administrator does more than create a `.repo` file: they confirm the correct system, preserve the original state, use unique IDs, validate connectivity and metadata, test the exact repositories independently, keep signature verification enabled whenever possible, and maintain a clear rollback plan.
