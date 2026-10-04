@@ -3,9 +3,7 @@
 <img src="YAML-for-beginners.png" width="700">
 
 
-Yeh notes YAML ko bilkul shuru se samjhate hain aur har important concept ko Ansible playbooks ke sath connect karte hain. Yeh linked M Prashant tutorial ke main concepts par based hain, lekin in mein additional Ansible examples, validation, troubleshooting, practice lab aur cleanup bhi shamil hain.
-
-Video reference: [What Is YAML for Beginners - Easy Explanation with Examples!](https://www.youtube.com/watch?v=Wl3N0Y6ZnBU)
+Yeh notes YAML ko bilkul shuru se samjhate hain aur har important concept ko Ansible playbooks ke sath connect karte hain. 
 
 ## Index
 
