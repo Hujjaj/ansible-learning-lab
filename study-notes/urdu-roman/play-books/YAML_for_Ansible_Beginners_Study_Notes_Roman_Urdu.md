@@ -62,6 +62,14 @@ In notes ko complete karne ke baad aap:
 
 YAML ek human-readable data-serialization format hai. Isay structured data organize karne aur configuration files likhne ke liye use kiya jata hai.
 
+> Data serialization is the process of converting data into a structured, storable, and transferable format.
+
+Examples of serialization formats include:
+- YAML
+- JSON
+- XML
+YAML represents data; it does not execute automation itself. Ansible reads the YAML and performs the specified automation.
+
 YAML ka modern full form hai:
 
 > YAML Ain't Markup Language

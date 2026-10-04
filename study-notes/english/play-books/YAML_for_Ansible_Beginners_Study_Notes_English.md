@@ -3,9 +3,9 @@
 <img src="YAML-for-beginners.png" width="700">
 
 
-These notes explain YAML from scratch and connect every important concept to Ansible playbooks. They are based on the main concepts demonstrated in the linked M Prashant tutorial, with additional Ansible-focused explanations, corrected examples, verification commands, practice exercises, and common-error guidance.
+These notes explain YAML from scratch and connect every important concept to Ansible playbooks. 
 
-Video reference: [What Is YAML for Beginners - Easy Explanation with Examples!](https://www.youtube.com/watch?v=Wl3N0Y6ZnBU)
+
 
 ## Index
 
@@ -63,6 +63,14 @@ After completing these notes, you should be able to:
 ## 2. What is YAML?
 
 YAML is a human-readable data-serialization format. It is commonly used to store structured data and write configuration files.
+
+> Data serialization is the process of converting data into a structured, storable, and transferable format.
+
+Examples of serialization formats include:
+- YAML
+- JSON
+- XML
+YAML represents data; it does not execute automation itself. Ansible reads the YAML and performs the specified automation.
 
 The modern expansion of YAML is:
 
