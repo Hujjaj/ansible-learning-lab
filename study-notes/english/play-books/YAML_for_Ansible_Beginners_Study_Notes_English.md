@@ -1,5 +1,8 @@
 # YAML for Ansible Beginners - Study Notes
 
+<img src="YAML-for-beginners.png" width="700">
+
+
 These notes explain YAML from scratch and connect every important concept to Ansible playbooks. They are based on the main concepts demonstrated in the linked M Prashant tutorial, with additional Ansible-focused explanations, corrected examples, verification commands, practice exercises, and common-error guidance.
 
 Video reference: [What Is YAML for Beginners - Easy Explanation with Examples!](https://www.youtube.com/watch?v=Wl3N0Y6ZnBU)
@@ -33,9 +36,11 @@ Video reference: [What Is YAML for Beginners - Easy Explanation with Examples!](
 25. [Validation methods](#25-validation-methods)
 26. [Common errors and troubleshooting](#26-common-errors-and-troubleshooting)
 27. [Hands-on practice lab](#27-hands-on-practice-lab)
-28. [Practice questions](#28-practice-questions)
-29. [Quick-reference tables](#29-quick-reference-tables)
-30. [Final summary](#30-final-summary)
+28. [Practice questions with answers](#28-practice-questions-with-answers)
+29. [Ansible dry run and Check Mode](#29-ansible-dry-run-and-check-mode)
+30. [Ansible verbosity options](#30-ansible-verbosity-options)
+31. [Quick-reference tables](#31-quick-reference-tables)
+32. [Final summary](#32-final-summary)
 
 ---
 
@@ -1204,30 +1209,211 @@ The second cleanup run should report `changed=0`.
 
 ---
 
-## 28. Practice questions
+## 28. Practice questions with answers
 
-1. What does YAML stand for?
-2. Is YAML a programming language?
-3. Why are spaces important in YAML?
-4. Why should tabs be avoided?
-5. What separates a key from its value?
-6. What symbol begins a list item?
-7. What is the difference between a list and a mapping?
-8. When should a string be quoted?
-9. What does `|` do in a multiline string?
-10. What does `>` do in a multiline string?
-11. What is the value of `file:` in an Ansible task when arguments appear below it?
-12. Why can `ping:` appear without arguments?
-13. Is every valid YAML file a valid Ansible playbook?
-14. Where do Ansible-specific keywords come from?
-15. Which command checks Ansible playbook syntax?
-16. Why should file modes such as `0644` be quoted?
-17. What does `changed=0` on a second run normally demonstrate?
-18. Why should confidential playbooks not be pasted into unknown online validators?
+### 1. What does YAML stand for?
+
+YAML stands for **YAML Ain't Markup Language**. It is a recursive acronym because the first letter refers to YAML itself.
+
+### 2. Is YAML a programming language?
+
+No. YAML is a human-readable **data-serialization language** used to represent structured data. It does not contain programming logic by itself.
+
+### 3. Why are spaces important in YAML?
+
+Spaces create indentation. YAML uses indentation to identify nesting, structure, and parent-child relationships.
+
+### 4. Why should tabs be avoided?
+
+YAML does not allow tabs for indentation. Tabs can cause parsing and syntax errors, so use spaces consistently.
+
+### 5. What separates a key from its value?
+
+A colon followed by a space (`: `) separates a key from its value.
+
+```yaml
+name: Khalid
+```
+
+### 6. What symbol begins a list item?
+
+A hyphen followed by a space (`- `) begins each list item.
+
+```yaml
+packages:
+  - nginx
+  - git
+```
+
+### 7. What is the difference between a list and a mapping?
+
+A list is an ordered collection of items. A mapping is a collection of key-value pairs.
+
+### 8. When should a string be quoted?
+
+Quote a string when it contains special characters, resembles a number or Boolean, or must preserve an exact format.
+
+### 9. What does `|` do in a multiline string?
+
+The literal block scalar `|` preserves line breaks.
+
+### 10. What does `>` do in a multiline string?
+
+The folded block scalar `>` usually converts line breaks into spaces and produces a paragraph.
+
+### 11. What is the value of `file:` when arguments appear below it?
+
+The value is not blank. The indented arguments collectively form the module's nested mapping value.
+
+```yaml
+file:
+  path: /tmp/demo
+  state: directory
+  mode: "0755"
+```
+
+### 12. Why can `ping:` appear without arguments?
+
+The Ansible `ping` module does not require arguments for its basic connectivity and Python test.
+
+### 13. Is every valid YAML file a valid Ansible playbook?
+
+No. A file can be valid YAML but still use an incorrect Ansible structure, keyword, module, or argument.
+
+### 14. Where do Ansible-specific keywords come from?
+
+Ansible defines keywords such as `hosts`, `tasks`, `become`, and `vars`, along with module names and their arguments. YAML only provides the data structure.
+
+### 15. Which command checks Ansible playbook syntax?
+
+```bash
+ansible-playbook playbook.yml --syntax-check
+```
+
+### 16. Why should file modes such as `0644` be quoted?
+
+Quoting preserves the exact permission format and prevents unintended numeric interpretation.
+
+```yaml
+mode: "0644"
+```
+
+### 17. What does `changed=0` on a second run normally demonstrate?
+
+It normally demonstrates **idempotency**: the system is already in the desired state, so Ansible does not need to change it again.
+
+### 18. Why should confidential playbooks not be pasted into unknown online validators?
+
+Playbooks can contain usernames, IP addresses, tokens, passwords, keys, and infrastructure details. An unknown website could store or misuse that information.
 
 ---
 
-## 29. Quick-reference tables
+## 29. Ansible dry run and Check Mode
+
+### Definition
+
+Ansible calls a dry run **Check Mode**. It predicts changes without applying them when the modules involved support Check Mode.
+
+### Basic command
+
+```bash
+ansible-playbook playbook.yml --check
+```
+
+### Show proposed file differences
+
+```bash
+ansible-playbook playbook.yml --check --diff
+```
+
+- `--check` predicts what would change.
+- `--diff` displays the before-and-after difference for supported modules.
+
+### Run Check Mode against only `node1`
+
+```bash
+ansible-playbook playbook.yml --check --limit node1
+```
+
+### Specify the inventory explicitly
+
+```bash
+ansible-playbook -i ./inventory/nodes playbook.yml --check
+```
+
+### Ad-hoc Check Mode example
+
+```bash
+ansible three_tier_app -b -m dnf \
+  -a "name=nginx state=present" --check
+```
+
+### Important limitations
+
+- Not every module fully supports Check Mode.
+- `command`, `shell`, and `raw` cannot reliably predict arbitrary command changes.
+- Check Mode is a preview, not a guarantee that the real run will succeed.
+- A later task may fail in Check Mode if it depends on a file or resource that an earlier task would have created.
+- `--syntax-check` validates playbook syntax; it is not a dry run.
+
+### Recommended validation workflow
+
+```bash
+ansible-playbook playbook.yml --syntax-check
+ansible-playbook playbook.yml --check --diff
+ansible-playbook playbook.yml
+ansible-playbook playbook.yml
+```
+
+The second real run should ideally report `changed=0` when the playbook is idempotent.
+
+---
+
+## 30. Ansible verbosity options
+
+### Definition
+
+Verbosity options show additional execution details. Add the letter `v` after an Ansible command; more `v` characters produce more detailed output.
+
+| Option | Detail level | Recommended use |
+|---|---|---|
+| `-v` | Basic additional details | General learning and light troubleshooting |
+| `-vv` | More task and connection details | Investigating variables or task behavior |
+| `-vvv` | Detailed SSH and connection information | Diagnosing authentication, inventory, or SSH problems |
+| `-vvvv` | Very detailed connection debugging | Deep troubleshooting only; output can be extensive |
+
+### Playbook examples
+
+```bash
+ansible-playbook playbook.yml -v
+ansible-playbook playbook.yml -vv
+ansible-playbook playbook.yml -vvv
+ansible-playbook playbook.yml -vvvv
+```
+
+### Ad-hoc example
+
+```bash
+ansible three_tier_app -m ping -vvv
+```
+
+### Combine verbosity with Check Mode
+
+```bash
+ansible-playbook playbook.yml --check --diff -vv
+```
+
+### Use it in this lab environment
+
+```bash
+ansible-playbook -i ./inventory/nodes playbooks/example.yml --check --diff -vv
+```
+
+> **Caution:** Verbose output may reveal hostnames, IP addresses, file paths, usernames, and connection details. Review it before sharing screenshots or logs publicly. Start with `-v` or `-vv`; use `-vvv` when diagnosing SSH or connection failures.
+
+---
+
+## 31. Quick-reference tables
 
 ### YAML symbols
 
@@ -1272,13 +1458,14 @@ ansible-playbook playbooks/example.yml --syntax-check
 ansible-playbook playbooks/example.yml --list-hosts
 ansible-playbook playbooks/example.yml --list-tasks
 ansible-playbook playbooks/example.yml --check --diff
+ansible-playbook playbooks/example.yml --check --diff -vv
 ansible-playbook playbooks/example.yml
 ansible-playbook playbooks/example.yml
 ```
 
 ---
 
-## 30. Final summary
+## 32. Final summary
 
 - YAML is a human-readable data format widely used for configuration and automation.
 - YAML uses indentation to express structure and relationships.
@@ -1292,5 +1479,7 @@ ansible-playbook playbooks/example.yml
 - A module's indented arguments are collectively its value.
 - A module such as `ping` can be used without arguments, but many modules require an arguments mapping.
 - Validate playbooks with `ansible-playbook --syntax-check`.
+- Preview supported changes with `--check` and inspect file differences with `--diff`.
+- Use `-v` through `-vvvv` for progressively more detailed troubleshooting output.
 - Run automation twice to examine idempotency.
 - Keep a cleanup playbook so the lab can be practiced repeatedly.

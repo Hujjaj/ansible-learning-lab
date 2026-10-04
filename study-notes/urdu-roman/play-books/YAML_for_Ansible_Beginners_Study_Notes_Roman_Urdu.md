@@ -1,5 +1,8 @@
 # YAML for Ansible Beginners - Roman Urdu Study Notes
 
+<img src="YAML-for-beginners.png" width="700">
+
+
 Yeh notes YAML ko bilkul shuru se samjhate hain aur har important concept ko Ansible playbooks ke sath connect karte hain. Yeh linked M Prashant tutorial ke main concepts par based hain, lekin in mein additional Ansible examples, validation, troubleshooting, practice lab aur cleanup bhi shamil hain.
 
 Video reference: [What Is YAML for Beginners - Easy Explanation with Examples!](https://www.youtube.com/watch?v=Wl3N0Y6ZnBU)
@@ -33,9 +36,11 @@ Video reference: [What Is YAML for Beginners - Easy Explanation with Examples!](
 25. [Validation methods](#25-validation-methods)
 26. [Common errors aur troubleshooting](#26-common-errors-aur-troubleshooting)
 27. [Hands-on practice lab](#27-hands-on-practice-lab)
-28. [Practice questions](#28-practice-questions)
-29. [Quick-reference tables](#29-quick-reference-tables)
-30. [Final summary](#30-final-summary)
+28. [Practice questions aur answers](#28-practice-questions-aur-answers)
+29. [Ansible dry run aur Check Mode](#29-ansible-dry-run-aur-check-mode)
+30. [Ansible verbosity options](#30-ansible-verbosity-options)
+31. [Quick-reference tables](#31-quick-reference-tables)
+32. [Final summary](#32-final-summary)
 
 ---
 
@@ -1181,30 +1186,211 @@ Second cleanup run par `changed=0` aana chahiye.
 
 ---
 
-## 28. Practice questions
+## 28. Practice questions aur answers
 
-1. YAML ka full form kya hai?
-2. Kya YAML programming language hai?
-3. YAML mein spaces kyun important hain?
-4. Tabs avoid kyun karni chahiye?
-5. Key aur value ko kaun sa symbol separate karta hai?
-6. List item kaun se symbol se start hota hai?
-7. List aur mapping mein kya farq hai?
-8. String ko kab quote karna chahiye?
-9. Multiline string mein `|` kya karta hai?
-10. Multiline string mein `>` kya karta hai?
-11. Jab arguments neeche likhe hon to `file:` module ki value kya hoti hai?
-12. `ping:` arguments ke baghair kyun chal sakta hai?
-13. Kya har valid YAML file valid Ansible playbook hoti hai?
-14. Ansible-specific keywords kahan se aate hain?
-15. Ansible syntax check ka command kya hai?
-16. `0644` jaise file modes ko quote kyun karna chahiye?
-17. Second run par `changed=0` aam tor par kya demonstrate karta hai?
-18. Confidential playbook ko unknown online validator mein paste kyun nahi karna chahiye?
+### 1. YAML ka full form kya hai?
+
+YAML ka full form **YAML Ain't Markup Language** hai. Yeh recursive acronym hai kyun ke pehla letter YAML ko hi refer karta hai.
+
+### 2. Kya YAML programming language hai?
+
+Nahi. YAML human-readable **data-serialization language** hai jo structured data represent karti hai. Ismein apni programming logic nahi hoti.
+
+### 3. YAML mein spaces kyun important hain?
+
+Spaces indentation banati hain. YAML indentation se nesting, structure aur parent-child relationships identify karti hai.
+
+### 4. Tabs avoid kyun karni chahiye?
+
+YAML indentation ke liye tabs allow nahi karti. Tabs parsing aur syntax errors cause kar sakti hain, is liye consistently spaces use karein.
+
+### 5. Key aur value ko kaun sa symbol separate karta hai?
+
+Colon ke baad space (`: `) key aur value ko separate karta hai.
+
+```yaml
+name: Khalid
+```
+
+### 6. List item kaun se symbol se start hota hai?
+
+Har list item hyphen ke baad space (`- `) se start hota hai.
+
+```yaml
+packages:
+  - nginx
+  - git
+```
+
+### 7. List aur mapping mein kya farq hai?
+
+List ordered items ka collection hoti hai, jabke mapping key-value pairs ka collection hoti hai.
+
+### 8. String ko kab quote karna chahiye?
+
+String ko quote karein jab usmein special characters hon, woh number ya Boolean jaisi nazar aaye, ya exact format preserve karna ho.
+
+### 9. Multiline string mein `|` kya karta hai?
+
+Literal block scalar `|` line breaks ko preserve karta hai.
+
+### 10. Multiline string mein `>` kya karta hai?
+
+Folded block scalar `>` aam tor par line breaks ko spaces mein convert karke paragraph bana deta hai.
+
+### 11. Jab arguments neeche likhe hon to `file:` ki value kya hoti hai?
+
+Value blank nahi hoti. Neeche ke indented arguments mil kar module ki nested mapping value bante hain.
+
+```yaml
+file:
+  path: /tmp/demo
+  state: directory
+  mode: "0755"
+```
+
+### 12. `ping:` arguments ke baghair kyun chal sakta hai?
+
+Ansible `ping` module ke basic connectivity aur Python test ke liye koi required argument nahi hai.
+
+### 13. Kya har valid YAML file valid Ansible playbook hoti hai?
+
+Nahi. File valid YAML ho sakti hai lekin uska Ansible structure, keyword, module ya argument ghalat ho sakta hai.
+
+### 14. Ansible-specific keywords kahan se aate hain?
+
+`hosts`, `tasks`, `become`, `vars`, module names aur unke arguments Ansible define karta hai. YAML sirf data structure provide karti hai.
+
+### 15. Ansible syntax check ka command kya hai?
+
+```bash
+ansible-playbook playbook.yml --syntax-check
+```
+
+### 16. `0644` jaise file modes ko quote kyun karna chahiye?
+
+Quotes exact permission format preserve karti hain aur unintended numeric interpretation se bachati hain.
+
+```yaml
+mode: "0644"
+```
+
+### 17. Second run par `changed=0` aam tor par kya demonstrate karta hai?
+
+Yeh aam tor par **idempotency** demonstrate karta hai: system pehle se desired state mein hai, is liye Ansible ko dobara change karne ki zarurat nahi.
+
+### 18. Confidential playbook ko unknown online validator mein paste kyun nahi karna chahiye?
+
+Playbook mein usernames, IP addresses, tokens, passwords, keys aur infrastructure details ho sakti hain. Unknown website is information ko store ya misuse kar sakti hai.
 
 ---
 
-## 29. Quick-reference tables
+## 29. Ansible dry run aur Check Mode
+
+### Definition
+
+Ansible mein dry run ko **Check Mode** kehte hain. Jab involved modules Check Mode support karte hon, Ansible actual changes apply kiye baghair predict karta hai ke kya change hoga.
+
+### Basic command
+
+```bash
+ansible-playbook playbook.yml --check
+```
+
+### Proposed file differences dekhein
+
+```bash
+ansible-playbook playbook.yml --check --diff
+```
+
+- `--check` predict karta hai ke kya change hoga.
+- `--diff` supported modules ke liye before aur after difference show karta hai.
+
+### Sirf `node1` par Check Mode
+
+```bash
+ansible-playbook playbook.yml --check --limit node1
+```
+
+### Inventory explicitly specify karein
+
+```bash
+ansible-playbook -i ./inventory/nodes playbook.yml --check
+```
+
+### Ad-hoc Check Mode example
+
+```bash
+ansible three_tier_app -b -m dnf \
+  -a "name=nginx state=present" --check
+```
+
+### Important limitations
+
+- Har module Check Mode ko completely support nahi karta.
+- `command`, `shell` aur `raw` arbitrary commands ke changes reliably predict nahi kar sakte.
+- Check Mode ek preview hai; yeh real run successful hone ki guarantee nahi deta.
+- Agar later task kisi aisi file ya resource par depend karta ho jo earlier task create karta, to Check Mode mein woh task fail ho sakta hai.
+- `--syntax-check` sirf syntax validate karta hai; yeh dry run nahi hai.
+
+### Recommended validation workflow
+
+```bash
+ansible-playbook playbook.yml --syntax-check
+ansible-playbook playbook.yml --check --diff
+ansible-playbook playbook.yml
+ansible-playbook playbook.yml
+```
+
+Idempotent playbook ke second real run par ideally `changed=0` aana chahiye.
+
+---
+
+## 30. Ansible verbosity options
+
+### Definition
+
+Verbosity options execution ki additional details show karte hain. Ansible command ke baad `v` add kiya jata hai; jitne zyada `v` hon ge, utni zyada detailed output milegi.
+
+| Option | Detail level | Recommended use |
+|---|---|---|
+| `-v` | Basic additional details | General learning aur light troubleshooting |
+| `-vv` | Zyada task aur connection details | Variables ya task behavior investigate karna |
+| `-vvv` | Detailed SSH aur connection information | Authentication, inventory ya SSH problems diagnose karna |
+| `-vvvv` | Bohat detailed connection debugging | Sirf deep troubleshooting; output bohat extensive ho sakti hai |
+
+### Playbook examples
+
+```bash
+ansible-playbook playbook.yml -v
+ansible-playbook playbook.yml -vv
+ansible-playbook playbook.yml -vvv
+ansible-playbook playbook.yml -vvvv
+```
+
+### Ad-hoc example
+
+```bash
+ansible three_tier_app -m ping -vvv
+```
+
+### Verbosity ko Check Mode ke sath use karein
+
+```bash
+ansible-playbook playbook.yml --check --diff -vv
+```
+
+### Apne lab environment mein use karein
+
+```bash
+ansible-playbook -i ./inventory/nodes playbooks/example.yml --check --diff -vv
+```
+
+> **Caution:** Verbose output mein hostnames, IP addresses, file paths, usernames aur connection details nazar aa sakti hain. Screenshots ya logs publicly share karne se pehle review karein. `-v` ya `-vv` se start karein; SSH ya connection failure diagnose karne ke liye `-vvv` use karein.
+
+---
+
+## 31. Quick-reference tables
 
 ### YAML symbols
 
@@ -1249,13 +1435,14 @@ ansible-playbook playbooks/example.yml --syntax-check
 ansible-playbook playbooks/example.yml --list-hosts
 ansible-playbook playbooks/example.yml --list-tasks
 ansible-playbook playbooks/example.yml --check --diff
+ansible-playbook playbooks/example.yml --check --diff -vv
 ansible-playbook playbooks/example.yml
 ansible-playbook playbooks/example.yml
 ```
 
 ---
 
-## 30. Final summary
+## 32. Final summary
 
 - YAML human-readable data format hai jo configuration aur automation mein commonly use hoti hai.
 - YAML structure aur relationships show karne ke liye indentation use karti hai.
@@ -1269,5 +1456,7 @@ ansible-playbook playbooks/example.yml
 - Module ke neeche indented arguments mil kar module ki value bante hain.
 - `ping` jaisa module arguments ke baghair use ho sakta hai, lekin bohat se modules ko argument mapping chahiye.
 - Playbook ko `ansible-playbook --syntax-check` se validate karein.
+- Supported changes ko `--check` se preview aur file differences ko `--diff` se inspect karein.
+- Progressively detailed troubleshooting output ke liye `-v` se `-vvvv` use karein.
 - Idempotency check karne ke liye automation ko dobara run karein.
 - Lab ko repeat karne ke liye cleanup playbook zaroor rakhein.

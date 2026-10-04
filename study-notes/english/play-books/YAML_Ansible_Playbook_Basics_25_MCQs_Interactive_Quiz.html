@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YAML & Ansible Playbook Basics — 25 MCQs</title>
+  <style>
+    :root {
+      --bg: #0f172a; --card: #1e293b; --card2: #111827; --line: #475569;
+      --text: #f8fafc; --muted: #cbd5e1; --accent: #f59e0b;
+      --accent2: #fde047; --good: #22c55e; --bad: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #334155 0, var(--bg) 48%);
+    }
+    .wrap { width: min(900px, calc(100% - 24px)); margin: 28px auto; }
+    .hero, .card {
+      background: rgba(30, 41, 59, .97); border: 1px solid var(--line);
+      border-radius: 20px; box-shadow: 0 20px 55px rgba(0, 0, 0, .35);
+    }
+    .hero { padding: 22px; text-align: center; margin-bottom: 18px; }
+    .hero h1 { margin: 0 0 5px; color: var(--accent2); font-size: clamp(1.55rem, 4vw, 2.25rem); }
+    .hero p { margin: 0 0 18px; color: var(--muted); }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .stat { background: var(--card2); border-radius: 12px; padding: 10px; }
+    .stat span { display: block; color: var(--muted); font-size: .82rem; text-transform: uppercase; }
+    .stat strong { font-size: 1.15rem; }
+    .progress { height: 12px; margin-top: 16px; background: #334155; border-radius: 99px; overflow: hidden; }
+    .progress div { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .3s; }
+    .card { padding: clamp(18px, 4vw, 30px); }
+    #question { margin: 0 0 18px; font-size: clamp(1.25rem, 3vw, 1.65rem); }
+    .answers { display: grid; gap: 12px; }
+    .answer {
+      display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left;
+      border: 2px solid var(--line); background: var(--card2); color: var(--text);
+      border-radius: 12px; padding: 14px; cursor: pointer; font: inherit; transition: .16s;
+    }
+    .answer:hover:not(:disabled), .answer.selected { border-color: var(--accent); transform: translateY(-1px); }
+    .letter { min-width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: #334155; font-weight: 800; }
+    .answer.correct { border-color: var(--good); background: #052e16; }
+    .answer.wrong { border-color: var(--bad); background: #450a0a; }
+    .answer:disabled { cursor: default; }
+    .feedback { display: none; margin-top: 16px; padding: 14px; border-radius: 11px; }
+    .feedback.good { display: block; background: #14532d; }
+    .feedback.bad { display: block; background: #7f1d1d; }
+    .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+    .action { border: 0; border-radius: 10px; padding: 12px 18px; font-weight: 800; cursor: pointer; background: var(--accent); color: #111827; }
+    .action.secondary { background: var(--muted); }
+    .action:disabled { opacity: .45; cursor: not-allowed; }
+    .hidden { display: none !important; }
+    .result { text-align: center; }
+    .result h2 { margin-top: 0; }
+    .score-big { color: var(--accent2); font-size: clamp(2.4rem, 8vw, 4rem); font-weight: 900; }
+    .grade { color: var(--muted); margin: 0 0 18px; }
+    .review { text-align: left; margin-top: 26px; }
+    .review article { margin: 12px 0; padding: 15px; background: var(--card2); border-left: 5px solid var(--bad); border-radius: 9px; }
+    .review article.correct-review { border-color: var(--good); }
+    .review small { color: var(--muted); }
+    .notice { margin-top: 12px; color: var(--muted); font-size: .9rem; }
+    @media (max-width: 580px) {
+      .wrap { margin: 12px auto; }
+      .stats { grid-template-columns: 1fr; }
+      .actions { flex-direction: column; }
+      .action { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="hero">
+      <h1>YAML & Ansible Playbook Basics</h1>
+      <p>25 interactive multiple-choice questions</p>
+      <div class="stats">
+        <div class="stat"><span>Question</span><strong id="position">1 / 25</strong></div>
+        <div class="stat"><span>Score</span><strong id="score">0</strong></div>
+        <div class="stat"><span>Time Remaining</span><strong id="timer">20:00</strong></div>
+      </div>
+      <div class="progress" aria-label="Quiz progress"><div id="progressBar"></div></div>
+    </header>
+
+    <section class="card" id="quizPanel">
+      <h2 id="question"></h2>
+      <div class="answers" id="answers"></div>
+      <div class="feedback" id="feedback" aria-live="polite"></div>
+      <div class="actions">
+        <button class="action" id="checkButton" disabled>Check Answer</button>
+        <button class="action secondary hidden" id="nextButton">Next Question</button>
+      </div>
+      <p class="notice">Select one answer. Your selection cannot be changed after checking it.</p>
+    </section>
+
+    <section class="card result hidden" id="resultPanel">
+      <h2>Quiz Complete</h2>
+      <div class="score-big" id="finalScore"></div>
+      <p class="grade" id="summary"></p>
+      <button class="action" id="retryButton">Reattempt & Shuffle</button>
+      <div class="review" id="review"></div>
+    </section>
+  </main>
+
+  <script>
+    const questionBank = [
+      {q:"What does YAML stand for today?",o:["Yet Another Markup Language","YAML Ain't Markup Language","Your Automated Machine Language","Young Application Markup Language"],a:1,e:"YAML is a recursive acronym meaning YAML Ain't Markup Language."},
+      {q:"What is YAML mainly used for?",o:["Compiling programs","Formatting disks","Representing structured data","Encrypting passwords"],a:2,e:"YAML is a human-readable data-serialization format used to represent structured data."},
+      {q:"Why does Ansible commonly use YAML?",o:["It clearly represents plays, tasks, variables, and lists","It replaces SSH","It installs Python automatically","It creates every inventory"],a:0,e:"YAML clearly expresses the structured data used in Ansible playbooks."},
+      {q:"Which characters should be used for YAML indentation?",o:["Tabs","Spaces","Semicolons","Commas"],a:1,e:"YAML indentation uses spaces. Tabs can cause parsing errors."},
+      {q:"What does indentation represent in YAML?",o:["File permissions","Parent-child structure","Network routes","Command history"],a:1,e:"Indentation expresses nesting and parent-child relationships."},
+      {q:"Which line is a valid YAML key-value pair?",o:["name = Khalid","name: Khalid","name -> Khalid","name; Khalid"],a:1,e:"A colon followed by a space separates a YAML key from its value."},
+      {q:"Which symbol starts a YAML list item?",o:["#","-","&","@"],a:1,e:"A hyphen followed by a space begins each sequence or list item."},
+      {q:"Which symbol begins a YAML comment?",o:["//","#",";","%"],a:1,e:"The hash symbol begins a YAML comment."},
+      {q:"Which value is normally interpreted as an integer?",o:["\"25\"","25","true","null"],a:1,e:"An unquoted whole number is normally interpreted as an integer."},
+      {q:"Which values are the clearest recommended YAML Boolean values?",o:["yes and no","1 and 0","true and false","on and off"],a:2,e:"Using true and false avoids ambiguity across YAML versions and tools."},
+      {q:"What does null represent in YAML?",o:["The number zero","An empty list","No assigned value","False only"],a:2,e:"null represents the absence of an assigned value."},
+      {q:"Why is an Ansible mode often written as \"0644\"?",o:["To make it Boolean","To preserve an unambiguous permission value","To enable SSH","To create a list"],a:1,e:"Quoting a file mode preserves the intended permission format and prevents numeric ambiguity."},
+      {q:"What does the | block scalar do?",o:["Deletes line breaks","Preserves line breaks","Creates a comment","Starts a list"],a:1,e:"The literal block scalar preserves newline characters in multiline text."},
+      {q:"What does the > block scalar generally do?",o:["Folds most line breaks into spaces","Encrypts text","Creates variables","Ends a play"],a:0,e:"The folded block scalar usually joins lines into a paragraph."},
+      {q:"A student key with indented name and city keys is which structure?",o:["Scalar","List","Nested mapping","Comment"],a:2,e:"The indented child key-value pairs form a nested mapping."},
+      {q:"A subjects key followed by hyphenated values is which structure?",o:["List","Integer","Boolean","Comment"],a:0,e:"Hyphenated items under one key form a list or sequence."},
+      {q:"In an Ansible playbook, what is the value of tasks normally?",o:["A list of task mappings","One Boolean","Only an IP address","A shell history"],a:0,e:"The tasks keyword contains an ordered list of task mappings."},
+      {q:"What does hosts specify in an Ansible play?",o:["The target inventory host or group","Module arguments","The YAML version","The output filename"],a:0,e:"The hosts keyword selects the inventory hosts or groups targeted by the play."},
+      {q:"In a task containing file:, what is file?",o:["An inventory group","An Ansible module","A variable value","The playbook filename"],a:1,e:"file is the module used by that task to manage files, directories, and links."},
+      {q:"Under file:, what are path, state, and mode?",o:["Plays","Module arguments","Inventory groups","Handlers"],a:1,e:"They are arguments passed to the file module."},
+      {q:"Is the value of file: blank when arguments are indented below it?",o:["Yes, always","No; the nested argument mapping is its value","Only on Rocky Linux","Only when become is true"],a:1,e:"The indented arguments collectively form the module's mapping value."},
+      {q:"Why can ping: be used without nested arguments?",o:["It is not a module","Its basic operation has no required arguments","It disables SSH","It gathers all system facts"],a:1,e:"The ping module can perform its basic connectivity and Python test without arguments."},
+      {q:"Who defines meanings such as hosts, tasks, and file?",o:["YAML","Ansible","SSH","The Linux kernel"],a:1,e:"YAML supplies structure, while Ansible defines playbook keywords, modules, and arguments."},
+      {q:"Which command checks playbook syntax without running tasks?",o:["ansible-playbook site.yml --syntax-check","ansible site.yml -m syntax","yaml --run site.yml","ansible-inventory site.yml"],a:0,e:"The --syntax-check option validates playbook syntax without executing the tasks."},
+      {q:"A second playbook run reports changed=0. What does this usually demonstrate?",o:["SSH failure","The desired state already exists","The YAML file was deleted","The inventory is empty"],a:1,e:"This normally demonstrates idempotency: no further change is required."}
+    ];
+
+    let quiz = [], index = 0, score = 0, selected = null, records = [];
+    let secondsLeft = 1200, timerId = null, startedAt = 0, finished = false;
+    const byId = id => document.getElementById(id);
+
+    function shuffle(items) {
+      const copy = [...items];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    function prepareQuiz() {
+      quiz = shuffle(questionBank).map(item => {
+        const options = item.o.map((text, i) => ({text, correct: i === item.a}));
+        return {question: item.q, options: shuffle(options), explanation: item.e};
+      });
+    }
+
+    function startQuiz() {
+      prepareQuiz();
+      index = 0; score = 0; selected = null; records = []; secondsLeft = 1200;
+      startedAt = Date.now(); finished = false;
+      clearInterval(timerId);
+      byId("score").textContent = "0";
+      byId("timer").textContent = "20:00";
+      byId("quizPanel").classList.remove("hidden");
+      byId("resultPanel").classList.add("hidden");
+      timerId = setInterval(updateTimer, 1000);
+      renderQuestion();
+    }
+
+    function updateTimer() {
+      secondsLeft--;
+      const minutes = Math.floor(Math.max(0, secondsLeft) / 60);
+      const seconds = Math.max(0, secondsLeft) % 60;
+      byId("timer").textContent = `${String(minutes).padStart(2,"0")}:${String(seconds).padStart(2,"0")}`;
+      if (secondsLeft <= 0) autoSubmit();
+    }
+
+    function renderQuestion() {
+      selected = null;
+      const item = quiz[index];
+      byId("position").textContent = `${index + 1} / ${quiz.length}`;
+      byId("progressBar").style.width = `${(index / quiz.length) * 100}%`;
+      byId("question").textContent = item.question;
+      byId("feedback").className = "feedback";
+      byId("feedback").textContent = "";
+      byId("checkButton").disabled = true;
+      byId("checkButton").classList.remove("hidden");
+      byId("nextButton").classList.add("hidden");
+      const answers = byId("answers");
+      answers.innerHTML = "";
+      item.options.forEach((option, optionIndex) => {
+        const button = document.createElement("button");
+        button.className = "answer";
+        button.innerHTML = `<span class="letter">${String.fromCharCode(65 + optionIndex)}</span><span>${escapeHtml(option.text)}</span>`;
+        button.addEventListener("click", () => selectAnswer(optionIndex, button));
+        answers.appendChild(button);
+      });
+    }
+
+    function selectAnswer(optionIndex, button) {
+      [...byId("answers").children].forEach(item => item.classList.remove("selected"));
+      button.classList.add("selected");
+      selected = optionIndex;
+      byId("checkButton").disabled = false;
+    }
+
+    function checkAnswer() {
+      if (selected === null || finished) return;
+      const item = quiz[index];
+      const chosen = item.options[selected];
+      const buttons = [...byId("answers").children];
+      buttons.forEach((button, i) => {
+        button.disabled = true;
+        if (item.options[i].correct) button.classList.add("correct");
+      });
+      if (chosen.correct) {
+        score++;
+        buttons[selected].classList.add("correct");
+      } else {
+        buttons[selected].classList.add("wrong");
+      }
+      byId("score").textContent = String(score);
+      const feedback = byId("feedback");
+      feedback.className = `feedback ${chosen.correct ? "good" : "bad"}`;
+      feedback.innerHTML = `<strong>${chosen.correct ? "Correct!" : "Incorrect."}</strong> ${escapeHtml(item.explanation)}`;
+      records.push({
+        question: item.question,
+        selected: chosen.text,
+        correct: item.options.find(option => option.correct).text,
+        explanation: item.explanation,
+        isCorrect: chosen.correct
+      });
+      byId("checkButton").classList.add("hidden");
+      byId("nextButton").classList.remove("hidden");
+      byId("nextButton").textContent = index === quiz.length - 1 ? "View Results" : "Next Question";
+    }
+
+    function nextQuestion() {
+      index++;
+      if (index < quiz.length) renderQuestion(); else finishQuiz(false);
+    }
+
+    function autoSubmit() {
+      if (finished) return;
+      clearInterval(timerId);
+      if (selected !== null && records.length === index) {
+        const item = quiz[index];
+        const chosen = item.options[selected];
+        if (chosen.correct) score++;
+        records.push({question:item.question, selected:chosen.text, correct:item.options.find(o=>o.correct).text, explanation:item.explanation, isCorrect:chosen.correct});
+        index++;
+      }
+      while (index < quiz.length) {
+        const item = quiz[index];
+        records.push({question:item.question, selected:"No answer — time expired", correct:item.options.find(o=>o.correct).text, explanation:item.explanation, isCorrect:false});
+        index++;
+      }
+      finishQuiz(true);
+    }
+
+    function finishQuiz(timedOut) {
+      finished = true;
+      clearInterval(timerId);
+      byId("quizPanel").classList.add("hidden");
+      byId("resultPanel").classList.remove("hidden");
+      byId("progressBar").style.width = "100%";
+      byId("score").textContent = String(score);
+      const percentage = Math.round((score / questionBank.length) * 100);
+      const elapsed = timedOut ? 1200 : Math.min(1200, Math.round((Date.now() - startedAt) / 1000));
+      byId("finalScore").textContent = `${score} / ${questionBank.length} (${percentage}%)`;
+      byId("summary").textContent = `${timedOut ? "Time expired — quiz submitted automatically. " : ""}Correct: ${score} • Incorrect/unanswered: ${questionBank.length - score} • Time used: ${Math.floor(elapsed / 60)}m ${elapsed % 60}s`;
+      byId("review").innerHTML = "<h2>Final Answer Review</h2>" + records.map((record, i) => `
+        <article class="${record.isCorrect ? "correct-review" : ""}">
+          <strong>${i + 1}. ${escapeHtml(record.question)}</strong><br>
+          Your answer: ${escapeHtml(record.selected)}<br>
+          Correct answer: ${escapeHtml(record.correct)}<br>
+          <small>${escapeHtml(record.explanation)}</small>
+        </article>`).join("");
+      window.scrollTo({top: 0, behavior: "smooth"});
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"})[char]);
+    }
+
+    byId("checkButton").addEventListener("click", checkAnswer);
+    byId("nextButton").addEventListener("click", nextQuestion);
+    byId("retryButton").addEventListener("click", startQuiz);
+    startQuiz();
+  </script>
+</body>
+</html>
