@@ -134,6 +134,8 @@ YAML use karne wale common tools:
 
 YAML readable zaroor hai, lekin iska matlab yeh nahi ke indentation optional hai. Syntax phir bhi bilkul sahi honi chahiye.
 
+> Indentation uses spaces at the beginning of YAML lines to represent the structure and parent-child relationship of data.
+
 ---
 
 ## 5. YAML, JSON aur XML

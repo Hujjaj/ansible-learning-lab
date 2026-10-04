@@ -136,6 +136,8 @@ Tools that commonly use YAML include:
 
 YAML being easy to read does not mean indentation is optional. YAML syntax must still be correct.
 
+> Indentation uses spaces at the beginning of YAML lines to represent the structure and parent-child relationship of data.
+
 ---
 
 ## 5. YAML, JSON, and XML
