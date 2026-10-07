@@ -1,0 +1,5 @@
+Host ansible-control
+    HostName 192.168.1.233
+    User ansibleadmin
+    IdentityFile C:/Users/krmar/.ssh/id_ed25519
+    IdentitiesOnly yes
