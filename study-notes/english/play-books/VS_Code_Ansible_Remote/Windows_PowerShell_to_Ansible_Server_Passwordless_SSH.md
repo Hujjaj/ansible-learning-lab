@@ -305,6 +305,50 @@ Host ansible-control
     IdentitiesOnly yes
 ```
 
+### Windows profile name contains a space
+
+If the Windows profile is `C:\Users\windows 11`, do not leave the complete
+path unquoted. The safest and recommended configuration is:
+
+```sshconfig
+Host ansible-control
+    HostName 192.168.1.99
+    User ansibleadmin
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+```
+
+`~/.ssh/id_ed25519` automatically resolves to the current user's profile.
+Alternatively, quote the complete path:
+
+```sshconfig
+IdentityFile "C:/Users/windows 11/.ssh/id_ed25519"
+```
+
+Verify the username, profile, and key:
+
+```powershell
+$env:USERNAME
+$HOME
+$env:USERPROFILE
+Test-Path "$HOME\.ssh\id_ed25519"
+Get-ChildItem "$HOME\.ssh" -Force
+```
+
+Verify and test:
+
+```powershell
+ssh -G ansible-control |
+Select-String "hostname|user|identityfile|identitiesonly"
+ssh ansible-control
+ssh -vvv ansible-control
+```
+
+Changing the Windows display name normally does not rename the profile folder.
+Do not manually rename `C:\Users\windows 11`, because it can damage the
+profile configuration. Using `~` avoids the issue. If a clean path is
+required, create a new account with a simple name such as `ansiblelab`.
+
 Save the filename exactly as:
 
 ```text
